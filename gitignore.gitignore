@@ -1,0 +1,16 @@
+# Local/editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Never commit job data, backups or exported documents
+FSO-backup-*.json
+*.pdf
+*.xlsx
+*.xlsm
+!FSO_clean.xlsx
+
+# Node (if tooling is ever added)
+node_modules/
