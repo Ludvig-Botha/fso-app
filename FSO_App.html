@@ -1240,7 +1240,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <button class="btn btn-secondary" style="width:100%;margin-bottom:8px" onclick="odSaveClientId()">Save</button>
       <button class="btn btn-primary" id="od-sign-btn" style="width:100%;margin-bottom:8px" onclick="odToggleSign()">Sign in</button>
-      <button class="btn btn-secondary" style="width:100%" onclick="odSyncNow()">Sync now</button>
+      <button class="btn btn-secondary" style="width:100%" onclick="odSyncNow()">Sync now (both ways)</button>
+      <p style="font-size:.72rem;color:var(--grey);margin-top:8px;line-height:1.5">Sync pulls jobs from your other devices and pushes this device's jobs up. Your books, workbooks and PDFs live in your own OneDrive — each engineer only sees their own.</p>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">Sheet creation</div>
@@ -1283,7 +1284,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAAANSs0lwAAAAAAAAAAAAAAAAGAAAAX3JlbHMvUEsDB
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2936,7 +2937,7 @@ async function previewLocalFso() {
   toast('Building preview…');
   try {
     const bytes = await generateXLSXFilled(fso);
-    downloadBlob(bytes, fso.fsoNumber + ' preview.xlsx',
+    downloadBlob(bytes, fsoDocBaseName(fso) + ' preview.xlsx',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     toast('Preview saved — open it in Excel to confirm');
   } catch (e) {
@@ -3130,13 +3131,24 @@ async function generateXLSXFilled(fso) {
 
   files['xl/worksheets/sheet1.xml'] = enc.encode(xml);
 
-  // Ask Excel to do a full recalc on open, so anything we did not cover heals itself.
+  // We wrote every formula cell as a literal value above, so the cached
+  // calcChain is now stale. Leaving it in (or hand-editing calcPr) makes the
+  // Office PDF-conversion service reject the file with HTTP 406. Dropping
+  // calcChain.xml and its content-type entry keeps the file 100% valid and
+  // converts cleanly; Excel rebuilds the chain itself on open.
   try {
-    let wbXml = dec.decode(files['xl/workbook.xml']);
-    if (wbXml.indexOf('<calcPr') >= 0) wbXml = wbXml.replace(/<calcPr[^>]*\/>/, '<calcPr fullCalcOnLoad="1"/>');
-    else wbXml = wbXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
-    files['xl/workbook.xml'] = enc.encode(wbXml);
-  } catch (e) { console.warn('calcPr', e); }
+    delete files['xl/calcChain.xml'];
+    if (files['[Content_Types].xml']) {
+      let ct = dec.decode(files['[Content_Types].xml']);
+      ct = ct.replace(/<Override[^>]*calcChain[^>]*\/>/g, '');
+      files['[Content_Types].xml'] = enc.encode(ct);
+    }
+    if (files['xl/_rels/workbook.xml.rels']) {
+      let rels = dec.decode(files['xl/_rels/workbook.xml.rels']);
+      rels = rels.replace(/<Relationship[^>]*calcChain[^>]*\/>/g, '');
+      files['xl/_rels/workbook.xml.rels'] = enc.encode(rels);
+    }
+  } catch (e) { console.warn('calcChain cleanup', e); }
 
   // Signature images: image3 = engineer, image4 = customer (transparent placeholder stays if absent)
   const u8 = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
@@ -4619,12 +4631,40 @@ async function odExportFso(fso) {
   const itemId = book.config.xlsxItemId;
   const sheet = sheetNameFor(fso.fsoNumber);
   await odEnsureSheet(itemId, sheet, book, fso.fsoNumber);
-  const base = "/me/drive/items/" + itemId + "/workbook/worksheets('" + sheet + "')/range(address='";
+
+  // Use a persistent workbook session so the just-copied sheet is fully
+  // committed before we write, and so all range writes are batched against the
+  // same open workbook (individual session-less PATCHes on a fresh sheet can
+  // silently no-op — the cause of the "sheet created but empty" bug).
+  const sessionId = await odWorkbookSession(itemId);
+  const base = "/me/drive/items/" + itemId + "/workbook/worksheets('" + encodeURIComponent(sheet) + "')/range(address='";
+  const hdr = { 'workbook-session-id': sessionId };
   const writes = fsoSheetWrites(fso);
+  let wrote = 0;
   for (const w of writes) {
-    await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values } });
+    await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values }, headers: hdr });
+    wrote++;
   }
+  // Confirm something actually landed (read back the customer cell).
+  try {
+    const chk = await gFetchWb('GET', "/me/drive/items/" + itemId + "/workbook/worksheets('" + encodeURIComponent(sheet) + "')/range(address='F15')", { headers: hdr });
+    const got = chk && chk.values && chk.values[0] && chk.values[0][0];
+    if (!got) toast('Warning: workbook cell read back empty — check the sheet');
+  } catch (e) { console.warn('verify', e); }
+  await odCloseSession(itemId, sessionId);
   return book.config.webUrl;
+}
+
+// Open a persistent workbook session (retried while the workbook warms up).
+async function odWorkbookSession(itemId) {
+  const r = await gFetchWb('POST', '/me/drive/items/' + itemId + '/workbook/createSession',
+    { json: { persistChanges: true } });
+  return r && r.id;
+}
+async function odCloseSession(itemId, sessionId) {
+  if (!sessionId) return;
+  try { await gFetch('POST', '/me/drive/items/' + itemId + '/workbook/closeSession', { headers: { 'workbook-session-id': sessionId } }); }
+  catch (e) { console.warn('closeSession', e); }
 }
 
 // ---- Sync: app_index.json + per-book book_<id>.json --------------------
@@ -4800,14 +4840,58 @@ function odToggleSign() {
 }
 async function odSyncNow() {
   if (!odIsConnected()) { toast('Sign in first'); return; }
+  if (!isOnline()) { toast('You are offline'); return; }
   toast('Syncing…');
   try {
+    // 1) PULL — merge every book that exists in the cloud index into local
+    //    (this is what was missing: sync only ever pushed up before, so a
+    //    second device never saw the first device's jobs).
+    const folderId = await odEnsureFolder();
+    const idx = await odGetJson(folderId, 'app_index.json');
+    if (idx) await odMergeFromCloud(idx);
+    // 2) PUSH — send local books up (conflict-aware per FSO), refresh index
     for (const id of Object.keys(APP.books)) await syncBook(id);
     await syncIndex();
     await odDrainQueue();
-    toast('OneDrive synced');
+    toast('OneDrive synced (both ways)');
   } catch (e) { toast('Sync error: ' + (e.message || e)); }
   renderSettingsOneDrive();
+  if (ctx.screen === 'screen-home') renderHome();
+}
+
+// Merge all cloud books into local without throwing away local edits.
+// Per FSO: newest modifiedAt wins; books only on the cloud are added whole.
+async function odMergeFromCloud(idx) {
+  if (idx.customers && !(APP.customers || []).length) APP.customers = idx.customers;
+  if (idx.settings && idx.settings.rates && !APP.settings.rates) APP.settings.rates = idx.settings.rates;
+  const parent = await odEnsureFolder();
+  let pulled = 0, newBooks = 0;
+  for (const bm of (idx.books || [])) {
+    try {
+      const bf = await odEnsureChildFolder(parent, bm.name);
+      const data = await odGetJson(bf, 'book_' + bm.id + '.json');
+      if (!data) continue;
+      const local = APP.books[bm.id];
+      if (!local) {
+        APP.books[bm.id] = { id: bm.id, active: bm.active !== false, config: data.config, fsos: data.fsos || {} };
+        newBooks++;
+        pulled += Object.keys(data.fsos || {}).length;
+      } else {
+        Object.keys(data.fsos || {}).forEach(k => {
+          const c = data.fsos[k], l = local.fsos[k];
+          if (!l || (c.modifiedAt || 0) > (l.modifiedAt || 0)) { local.fsos[k] = c; pulled++; }
+        });
+        // adopt cloud workbook id/url if local never got one
+        if (!local.config.xlsxItemId && data.config && data.config.xlsxItemId) {
+          local.config.xlsxItemId = data.config.xlsxItemId;
+          local.config.webUrl = data.config.webUrl;
+        }
+      }
+    } catch (e) { console.warn('merge book', bm.id, e); }
+  }
+  if (idx.activeBookId && APP.books[idx.activeBookId] && !APP.activeBookId) APP.activeBookId = idx.activeBookId;
+  saveData();
+  if (pulled || newBooks) toast('Pulled ' + pulled + ' FSO(s)' + (newBooks ? ', ' + newBooks + ' book(s)' : '') + ' from cloud');
 }
 
 function odSetSheetMode(m) {
@@ -4874,7 +4958,16 @@ async function startup() {
   applyTheme();
 
   // OneDrive: restore session and sync in the background (never blocks startup / offline use)
-  odInit().then(function(){ if (odIsConnected()) odLoadFromCloud().then(odDrainQueue).catch(function(e){console.warn(e);}); }).catch(function(e){console.warn(e);});
+  odInit().then(function(){
+    if (!odIsConnected()) return;
+    // Pull cloud → merge → push, so a device that just signed in shows the
+    // other devices' jobs immediately (previously it only pushed local up).
+    odEnsureFolder()
+      .then(function(fid){ return odGetJson(fid, 'app_index.json'); })
+      .then(function(idx){ if (idx) return odMergeFromCloud(idx); })
+      .then(function(){ if (ctx.screen === 'screen-home') renderHome(); return odDrainQueue(); })
+      .catch(function(e){ console.warn('startup sync', e); });
+  }).catch(function(e){console.warn(e);});
   window.addEventListener('online', function(){ if (odIsConnected()) odDrainQueue(); });
 
   if (!APP.pin) {

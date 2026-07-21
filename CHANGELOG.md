@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.1.1 — 2026-07-21
+- FIX (406 PDF preview): removed the calcPr hand-edit and now strip the stale
+  calcChain.xml before export. That inconsistency made the Office PDF-conversion
+  service reject the file with HTTP 406 while Excel still opened it — which is why
+  the download preview worked but "Preview FSO (PDF)" failed and fell back to a
+  file named "<n> preview.xlsx".
+- FIX (empty workbook sheet): "Send to workbook" now writes through a persistent
+  workbook session and reads a cell back to confirm data landed. Session-less
+  writes on a just-copied sheet could silently no-op, leaving the sheet blank.
+- FIX (device sync): Sync is now TWO-WAY. Previously "Sync now" and startup only
+  pushed the local device up, so a second device never pulled the first device's
+  jobs. Both "Sync now" and app startup now pull the cloud index, merge every
+  book (newest-per-FSO wins, cloud-only books added whole), then push. Your data
+  stays in your own OneDrive; engineers still only see their own.
+- Fallback preview filename uses the official FSO number when present. SW cache v13.
+
 ## v2.1.0 — 2026-07-21
 - FIX: workbook creation — Graph worksheet calls now retry while the workbook service
   warms up and address sheets by name (worksheet IDs contain braces that broke URLs).
