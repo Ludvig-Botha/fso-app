@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.1.0 — 2026-07-21
+- FIX: workbook creation — Graph worksheet calls now retry while the workbook service
+  warms up and address sheets by name (worksheet IDs contain braces that broke URLs).
+  All sheet + FSO sheets now actually get created; failures show a toast instead of
+  passing silently.
+- FIX: preview/PDF totals — the sheet's formula cells are now computed by the app and
+  written as values (the template carried cached results from the FSO it was cleaned
+  from, and neither the filler nor Graph's PDF converter recalculates).
+- FIX: export emails — an address typed but not yet "tagged" (no Enter pressed) is now
+  included automatically.
+- Rates: removed from New Book; global under Settings → Rates; travel (km) rate split
+  External/Internal; everything defaults to 0 on first run; each FSO locks its rates at
+  the moment of export — later changes only affect unexported FSOs.
+- Customers: contacts (name/email/number) — import template, editor card, signature
+  name pick-list, tap-to-add email chips on export. Never printed on the FSO.
+- Customer_Import_Template.xlsx: company, site address, VAT, account, default round-trip
+  km, boilers (No/Model), contacts.
+- FSO screen: "Preview FSO (PDF)" (in-app viewer, nothing saved, no revision consumed),
+  "Open Job Folder ↗" (replaces PO/Requisition placeholder), "Create on Company System ✉"
+  — one email, signed PDF attached, To admin + CC service manager, sent from the
+  engineer's own mailbox (names/addresses under Settings → SharePoint).
+- Export screen: Preview now opens the FSO's sheet in the online workbook.
+- Active FSO list: shows sheet no · SharePoint reg no · company, with job description
+  below; search matches all of them.
+- Office default location set to John Thompson, Sacks Circle, Bellville South
+  Industrial, Bellville, Cape Town, 7530.
+- Rates for the online workbook sheet are written into the costing block so the sheet's
+  own formulas price with the FSO's locked rates. SW cache v12.
+
 ## v2.0.0 — 2026-07-19
 - **Two-number system**: new "Official FSO No." (from SharePoint registration) on FSO Details;
   printed in the FSO No field (F20) on sheet + PDF. Book numbers are now reference-only.

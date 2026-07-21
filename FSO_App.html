@@ -326,37 +326,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <input class="form-control" id="bs-eng-contact" placeholder="+27 83 297 3831" type="tel">
       </div>
     </div>
-    <div class="card">
-      <div class="card-title" style="margin-bottom:12px">Rates</div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>NT Rate (R/hr)</label>
-          <input class="form-control" id="bs-nt" type="number" placeholder="660.00" step="0.01">
-        </div>
-        <div class="form-group">
-          <label>OT 1.5× (R/hr)</label>
-          <input class="form-control" id="bs-ot15" type="number" placeholder="890.00" step="0.01">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>OT 2.0× (R/hr)</label>
-          <input class="form-control" id="bs-ot20" type="number" placeholder="1130.00" step="0.01">
-        </div>
-        <div class="form-group">
-          <label>KM Rate (R/km)</label>
-          <input class="form-control" id="bs-km" type="number" placeholder="8.50" step="0.01">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Call-out Rate (R)</label>
-          <input class="form-control" id="bs-callout" type="number" placeholder="0.00" step="0.01">
-        </div>
-        <div class="form-group"></div>
-      </div>
-      <div style="font-size:.75rem;color:var(--grey);margin-top:4px">VAT defaults to 15% — change it under Settings → Rates. Accommodation is now entered per FSO.</div>
-    </div>
+    <div style="font-size:.78rem;color:var(--grey);margin:4px 2px 0">Rates are managed under Settings → Rates and apply to all books. Each FSO locks in the rates that are current at the moment it is exported.</div>
     <div style="height:8px"></div>
   </div>
   <div class="bottombar">
@@ -715,7 +685,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <div class="email-tags" id="email-tags-wrap" onclick="focusEmailInput()">
         <input id="email-input" type="email" placeholder="Add address, press Enter" onkeydown="emailKeydown(event)" onblur="emailBlur()">
       </div>
-      <p style="font-size:.78rem;color:var(--grey);margin-top:6px">Sent from your OneDrive account with the PDF/workbook copy and ticked attachments.</p>
+      <div id="email-suggest" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+      <p style="font-size:.78rem;color:var(--grey);margin-top:6px">Sent from your OneDrive account with the PDF/workbook copy and ticked attachments. Tap a contact chip to add them.</p>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">Include attachments</div>
@@ -729,7 +700,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
   </div>
   <div class="bottombar">
     <div style="display:flex;gap:10px">
-      <button class="btn btn-secondary" onclick="previewLocalFso()" style="flex:0 0 40%">Preview</button>
+      <button class="btn btn-secondary" onclick="openFsoSheetOnline()" style="flex:0 0 40%">Preview Sheet</button>
       <button class="btn btn-primary" onclick="doExport()" style="flex:1">Send to Workbook</button>
     </div>
   </div>
@@ -905,14 +876,17 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <button class="icon-btn" onclick="saveRates()">✓</button>
   </div>
   <div class="body">
-    <p style="font-size:.8rem;color:var(--grey);margin-bottom:14px">Rates for the active book. The set used depends on the FSO's Job Type (External / Internal).</p>
+    <p style="font-size:.8rem;color:var(--grey);margin-bottom:14px">Rates apply to all books; the set used depends on the FSO's Job Type. Each FSO locks in the rates current at the moment it is exported — changes here only affect FSOs not yet exported.</p>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">External Job Rates</div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:8px"><label>NT (R/hr)</label><input class="form-control" id="sr-ext-nt" type="number" step="0.01"></div>
         <div class="form-group" style="margin-bottom:8px"><label>OT 1.5× (R/hr)</label><input class="form-control" id="sr-ext-ot15" type="number" step="0.01"></div>
       </div>
-      <div class="form-group" style="margin-bottom:0;width:calc(50% - 6px)"><label>OT 2.0× (R/hr)</label><input class="form-control" id="sr-ext-ot20" type="number" step="0.01"></div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0"><label>OT 2.0× (R/hr)</label><input class="form-control" id="sr-ext-ot20" type="number" step="0.01"></div>
+        <div class="form-group" style="margin-bottom:0"><label>Travel (R/km)</label><input class="form-control" id="sr-ext-km" type="number" step="0.01"></div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">Internal Job Rates</div>
@@ -920,15 +894,17 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <div class="form-group" style="margin-bottom:8px"><label>NT (R/hr)</label><input class="form-control" id="sr-int-nt" type="number" step="0.01"></div>
         <div class="form-group" style="margin-bottom:8px"><label>OT 1.5× (R/hr)</label><input class="form-control" id="sr-int-ot15" type="number" step="0.01"></div>
       </div>
-      <div class="form-group" style="margin-bottom:0;width:calc(50% - 6px)"><label>OT 2.0× (R/hr)</label><input class="form-control" id="sr-int-ot20" type="number" step="0.01"></div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0"><label>OT 2.0× (R/hr)</label><input class="form-control" id="sr-int-ot20" type="number" step="0.01"></div>
+        <div class="form-group" style="margin-bottom:0"><label>Travel (R/km)</label><input class="form-control" id="sr-int-km" type="number" step="0.01"></div>
+      </div>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">Shared</div>
       <div class="form-row">
-        <div class="form-group" style="margin-bottom:8px"><label>KM Rate (R/km)</label><input class="form-control" id="sr-km" type="number" step="0.01"></div>
         <div class="form-group" style="margin-bottom:8px"><label>Call-out (R)</label><input class="form-control" id="sr-callout" type="number" step="0.01"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>VAT %</label><input class="form-control" id="sr-vat" type="number" step="0.01"></div>
       </div>
-      <div class="form-group" style="margin-bottom:0;width:calc(50% - 6px)"><label>VAT %</label><input class="form-control" id="sr-vat" type="number" step="0.01"></div>
     </div>
     <p style="font-size:.78rem;color:var(--grey)">Material markup is automatic: External cost +30%, Internal cost +5%. Accommodation is entered per FSO.</p>
   </div>
@@ -970,6 +946,11 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <div class="card">
       <div class="card-header"><div class="card-title">Boilers</div><button class="btn btn-secondary btn-sm" onclick="addCustomerBoiler()">+ Add</button></div>
       <div id="cust-boilers"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Contacts</div><button class="btn btn-secondary btn-sm" onclick="addCustomerContact()">+ Add</button></div>
+      <p style="font-size:.72rem;color:var(--grey);margin-bottom:8px">Who you deal with at this company. Used for the signature name pick-list and email suggestions — never printed on the FSO.</p>
+      <div id="cust-contacts"></div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">Customer GPS (for km estimate)</div></div>
@@ -1055,6 +1036,18 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <textarea class="form-control mono" id="sp-register-url" rows="3" placeholder="https://actom.sharepoint.com/…"></textarea>
       </div>
       <button class="btn btn-secondary btn-sm" onclick="openSpRegister()">Test link ↗</button>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Company system emails</div>
+      <p style="font-size:.75rem;color:var(--grey);margin-bottom:10px;line-height:1.5">
+        Used by the "Create on Company System" button — one email with the signed PDF,
+        sent from your own mailbox to Admin, with the Service Manager in CC.
+      </p>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:8px"><label>Admin first name</label><input class="form-control" id="sp-admin-name" placeholder="Loriza"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>Admin email (To)</label><input class="form-control" id="sp-admin-email" type="email" placeholder="admin@…"></div>
+      </div>
+      <div class="form-group" style="margin-bottom:0"><label>Service manager email (CC)</label><input class="form-control" id="sp-manager-email" type="email" placeholder="manager@…"></div>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:8px">Upload exports to SharePoint</div>
@@ -1158,6 +1151,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
   <div id="sig-watermark" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.4rem;color:#e5e7eb;pointer-events:none;z-index:1;font-weight:300;letter-spacing:.05em">Sign here</div>
   <canvas id="sig-canvas"></canvas>
   <div id="sig-name-wrap" style="padding:12px 16px;border-top:1px solid var(--border);display:none">
+    <select class="form-control" id="sig-contact-select" style="margin-bottom:8px;display:none" onchange="sigContactPicked(this.value)"></select>
     <input class="form-control" id="sig-customer-name" placeholder="Customer full name">
   </div>
   <div class="sig-btns">
@@ -1289,7 +1283,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAAANSs0lwAAAAAAAAAAAAAAAAGAAAAX3JlbHMvUEsDB
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.1.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -1302,6 +1296,7 @@ let sigDrawing = false;
 let sigLastX = 0, sigLastY = 0;
 let sigHasStrokes = false;
 let custBoilers = [];   // working copy of a customer's boilers in the editor
+let custContacts = [];  // working copy of a customer's contacts in the editor
 let materialRows = null;  // parsed stores workbook rows (cached per session)
 let materialTargetIdx = -1;  // which day-material the search fills
 
@@ -1390,24 +1385,43 @@ function compressImageFile(file) {
 function initData() {
   return {
     books: {}, activeBookId: null, pin: null, notes: [], customers: [], departments: [],
-    settings: { fontSize: 'medium', theme: 'light', office: { label: 'John Thompson Office', gps: null }, materialLink: '',
+    settings: { fontSize: 'medium', theme: 'light', rates: defaultRates(),
+      office: { label: 'John Thompson, Sacks Circle, Bellville South Industrial, Bellville, Cape Town, 7530, South Africa', gps: null }, materialLink: '',
       oneDrive: { clientId: '', folderName: 'FSO App', folderId: null, account: null, connected: false, sheetMode: 'lazy', queue: [] } }
   };
 }
 
+// All rates start at 0 — real values are entered once under Settings → Rates.
+// Travel (km) rate is split internal/external like the labour rates.
 function defaultRates() {
   return {
-    external: { nt: 660, ot15: 890, ot20: 1130 },
-    internal: { nt: 660, ot15: 890, ot20: 1130 },
-    kmRate: 8.50, callOutRate: 0, vatPercent: 15
+    external: { nt: 0, ot15: 0, ot20: 0, km: 0 },
+    internal: { nt: 0, ot15: 0, ot20: 0, km: 0 },
+    callOutRate: 0, vatPercent: 15
   };
 }
+function globalRates() {
+  if (!APP.settings.rates) APP.settings.rates = defaultRates();
+  return APP.settings.rates;
+}
 
-// Resolve the active rate set (external/internal) for an FSO
+// Resolve the rate set for an FSO. Once an FSO has been exported its rates are
+// LOCKED (fso.lockedRates) — later changes in Settings only affect FSOs that
+// have not been exported yet.
 function fsoRates(fso) {
-  const r = APP.books[fso.bookId].config.rates;
+  if (fso.lockedRates) return fso.lockedRates;
+  const r = globalRates();
   const set = (fso.header.jobType === 'INTERNAL') ? r.internal : r.external;
-  return { nt: set.nt, ot15: set.ot15, ot20: set.ot20, kmRate: r.kmRate, callOutRate: r.callOutRate, vatPercent: r.vatPercent };
+  return { nt: set.nt || 0, ot15: set.ot15 || 0, ot20: set.ot20 || 0, kmRate: set.km || 0,
+           callOutRate: r.callOutRate || 0, vatPercent: (r.vatPercent === undefined ? 15 : r.vatPercent) };
+}
+// Snapshot of the currently-applicable rates, stored on the FSO at export time.
+function lockRatesForExport(fso) {
+  if (!fso.lockedRates) {
+    fso.lockedRates = fsoRates(fso);
+    addHistory(fso, 'Rates locked at export: NT R' + fso.lockedRates.nt + ', OT1.5 R' + fso.lockedRates.ot15 +
+      ', OT2.0 R' + fso.lockedRates.ot20 + ', km R' + fso.lockedRates.kmRate);
+  }
 }
 
 // Material markup factor by job type (external +30%, internal +5%)
@@ -1509,15 +1523,10 @@ function renderBookSetup() {
       '<h1>' + (hasBooks ? 'New Book' : 'First Book Setup') + '</h1>';
   }
   // Clear form fields for a fresh entry
-  ['bs-range-start','bs-range-end','bs-eng-name','bs-eng-contact','bs-nt','bs-ot15','bs-ot20','bs-km','bs-callout'].forEach(id => {
+  ['bs-range-start','bs-range-end','bs-eng-name','bs-eng-contact'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  // Pre-fill rates with defaults
-  document.getElementById('bs-nt').value    = '660';
-  document.getElementById('bs-ot15').value  = '890';
-  document.getElementById('bs-ot20').value  = '1130';
-  document.getElementById('bs-km').value    = '8.50';
   // Pre-fill engineer name from existing book if available
   const book = activeBook();
   if (book) {
@@ -1598,16 +1607,6 @@ async function saveBookSetup() {
   const name  = document.getElementById('bs-eng-name').value.trim();
   const cont  = document.getElementById('bs-eng-contact').value.trim();
   if (!start || !end || !name) { toast('Please fill in FSO range and name'); return; }
-  const nt = parseFloat(document.getElementById('bs-nt').value) || 660;
-  const ot15 = parseFloat(document.getElementById('bs-ot15').value) || 890;
-  const ot20 = parseFloat(document.getElementById('bs-ot20').value) || 1130;
-  const rates = {
-    external: { nt, ot15, ot20 },
-    internal: { nt, ot15, ot20 },
-    kmRate:      parseFloat(document.getElementById('bs-km').value)      || 8.50,
-    callOutRate: parseFloat(document.getElementById('bs-callout').value) || 0,
-    vatPercent:  15,
-  };
   const bookId = 'book-' + uid();
   const book = {
     id: bookId,
@@ -1615,7 +1614,7 @@ async function saveBookSetup() {
     config: {
       fsoRangeStart: start, fsoRangeEnd: end,
       engineerName: name, engineerContact: cont,
-      rates, createdDate: todayStr(), closedDate: null,
+      createdDate: todayStr(), closedDate: null,
       xlsxItemId: null, webUrl: null
     },
     fsos: {}
@@ -1674,6 +1673,7 @@ function newFso(fsoNumber, bookId) {
     accommodation: 0,
     nights: 0,
     spFolderUrl: '',
+    lockedRates: null,
     header: {
       customer: '', customerId: '', addressSite: '', jobType: 'EXTERNAL', department: '',
       officialNo: '',
@@ -1875,7 +1875,9 @@ function renderActive() {
   if (activeFilter !== 'all') fsos = fsos.filter(f => f.status === activeFilter);
   if (q) fsos = fsos.filter(f =>
     f.fsoNumber.toLowerCase().includes(q) ||
+    (f.header.officialNo || '').toLowerCase().includes(q) ||
     (f.header.customer || '').toLowerCase().includes(q) ||
+    (f.header.description || '').toLowerCase().includes(q) ||
     (f.header.addressSite || '').toLowerCase().includes(q)
   );
   // Sort: progress first, then open, then by fso number
@@ -1935,14 +1937,18 @@ function filterArchive() { renderArchive(); }
 // FSO LIST ITEM (shared)
 // ============================================================
 function fsoListItem(f) {
-  const hasCustomer = f.header.customer;
   const days = f.days.length;
   const t = calcTotals(f);
+  // Title: FSO sheet number · SharePoint reg number · Company name; sub: job description
+  const bits = ['<span class="mono">' + esc(f.fsoNumber) + '</span>'];
+  if ((f.header.officialNo || '').trim()) bits.push('<span class="mono">' + esc(f.header.officialNo.trim()) + '</span>');
+  if (f.header.customer) bits.push(esc(f.header.customer));
+  const sub = (f.header.description || '').trim() || (f.header.addressSite || 'No site');
   return '<div class="list-item" onclick="openFso(&#39;' + esc(f.fsoNumber) + '&#39;,&#39;' + f.bookId + '&#39;)">' +
     '<div class="icon-circle" style="background:var(--grey-light);font-size:1rem">' + statusIcon(f.status) + '</div>' +
     '<div class="list-item-main">' +
-      '<div class="list-item-title"><span class="mono">' + esc(f.fsoNumber) + '</span>' + (hasCustomer ? ' · ' + esc(f.header.customer) : '') + '</div>' +
-      '<div class="list-item-sub">' + (f.header.addressSite || 'No site') + ' · ' + days + ' day' + (days===1?'':'s') + '</div>' +
+      '<div class="list-item-title">' + bits.join(' · ') + '</div>' +
+      '<div class="list-item-sub">' + esc(sub) + ' · ' + days + ' day' + (days===1?'':'s') + '</div>' +
     '</div>' +
     '<div class="list-item-right">' +
       (f.exportState === 'queued' ? '<div style="font-size:.6rem;font-weight:700;color:#92400e;background:var(--orange-light);padding:2px 6px;border-radius:8px;margin-bottom:4px">READY TO SEND</div>' : '') +
@@ -1963,7 +1969,7 @@ function renderFsoEdit() {
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) { goBack(); return; }
   const book = APP.books[fso.bookId];
-  const rates = book.config.rates;
+  const rates = fsoRates(fso);
   document.getElementById('fso-edit-title').textContent = fso.fsoNumber;
   document.getElementById('fso-status-chip').innerHTML = statusChip(fso.status);
 
@@ -2108,11 +2114,12 @@ function renderFsoEdit() {
   html += '<button class="btn btn-secondary" disabled style="opacity:.5">Open Risk Assessment (Coming Soon)</button>';
   html += '</div>';
 
-  // External system placeholders (not wired yet)
+  // External systems + preview
   html += '<div class="card">';
-  html += '<div class="card-title" style="margin-bottom:10px">External Systems</div>';
-  html += '<button class="btn btn-secondary" style="margin-bottom:8px" onclick="toast(&#39;Coming soon — will create this FSO on the company system&#39;)">Create on Company System</button>';
-  html += '<button class="btn btn-secondary" onclick="toast(&#39;Coming soon — will open the PO / requisition system&#39;)">Create PO / Requisition</button>';
+  html += '<div class="card-title" style="margin-bottom:10px">Job Documents & Company System</div>';
+  html += '<button class="btn btn-secondary" style="margin-bottom:8px" onclick="previewFsoPdf()">Preview FSO (PDF)</button>';
+  html += '<button class="btn btn-secondary" style="margin-bottom:8px" onclick="openSpFolder()">Open Job Folder ↗</button>';
+  html += '<button class="btn btn-secondary" onclick="sendToCompanySystem()">Create on Company System ✉</button>';
   html += '</div>';
 
   // (Revision history is now opened via the 🕘 History button in the status row.)
@@ -2667,11 +2674,25 @@ function openSig(mode) {
   document.getElementById('sig-label').textContent = mode === 'engineer' ? 'Engineer Signature' : 'Customer Signature';
   document.getElementById('sig-name-wrap').style.display = mode === 'customer' ? 'block' : 'none';
   document.getElementById('sig-customer-name').value = fso.signatures.customerName || '';
+  // Contact dropdown: quick-pick who is signing, from the customer's imported contacts.
+  const sel = document.getElementById('sig-contact-select');
+  const cust = (APP.customers || []).find(c => c.id === fso.header.customerId);
+  const contacts = (cust && cust.contacts || []).filter(c => c.name);
+  if (mode === 'customer' && contacts.length) {
+    sel.innerHTML = '<option value="">— pick a contact, or type below —</option>' +
+      contacts.map(c => '<option value="' + esc(c.name) + '">' + esc(c.name) + '</option>').join('');
+    sel.style.display = 'block';
+    sel.value = contacts.some(c => c.name === fso.signatures.customerName) ? fso.signatures.customerName : '';
+  } else sel.style.display = 'none';
   document.getElementById('sig-overlay').classList.add('show');
   document.getElementById('sig-watermark').style.display = 'block';
   ctx.sigMode = mode;
   initSigCanvas();
   sigHasStrokes = false;
+}
+
+function sigContactPicked(name) {
+  if (name) document.getElementById('sig-customer-name').value = name;
 }
 
 function initSigCanvas() {
@@ -2819,6 +2840,7 @@ function renderExportScreen() {
   document.getElementById('exp-official-missing').style.display = off ? 'none' : 'block';
   if (off) document.getElementById('exp-official-no').textContent = off;
   setExportFmt(exportFmt);
+  renderEmailSuggestions();
   const tags = emailTags.map((t,i) =>
     '<div class="email-tag">' + esc(t) + '<button onclick="removeEmailTag(' + i + ')">×</button></div>').join('');
   const wrap = document.getElementById('email-tags-wrap');
@@ -2842,6 +2864,20 @@ function setExportFmt(fmt) {
 }
 
 function focusEmailInput() { document.getElementById('email-input').focus(); }
+
+// Suggestion chips: the FSO customer's contacts with an email address —
+// tap to add as a recipient. Sending is always the engineer's explicit choice.
+function renderEmailSuggestions() {
+  const wrap = document.getElementById('email-suggest');
+  if (!wrap) return;
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const cust = fso && (APP.customers || []).find(c => c.id === fso.header.customerId);
+  const opts = (cust && cust.contacts || []).filter(c => c.email && !emailTags.includes(c.email));
+  wrap.innerHTML = opts.length
+    ? opts.map(c => '<button class="btn btn-secondary btn-sm" style="width:auto;padding:6px 10px;font-size:.75rem" ' +
+        'onclick="emailTags.push(\'' + esc(c.email) + '\');renderEmailTags();renderEmailSuggestions()">+ ' + esc(c.name || c.email) + '</button>').join(' ')
+    : '';
+}
 
 function emailKeydown(e) {
   const inp = document.getElementById('email-input');
@@ -2874,6 +2910,22 @@ function renderEmailTags() {
   wrap.innerHTML = tags;
   wrap.appendChild(inp);
   inp.focus();
+}
+
+// Export-screen preview: open this FSO's sheet in the book workbook in
+// Excel online. Falls back to a local filled-xlsx download when offline or
+// the workbook does not exist yet.
+async function openFsoSheetOnline() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const book = APP.books[fso.bookId];
+  if (book.config.webUrl && isOnline()) {
+    window.open(book.config.webUrl, '_blank');
+    toast('Opening workbook — sheet ' + sheetNameFor(fso.fsoNumber));
+    return;
+  }
+  toast(book.config.webUrl ? 'Offline — downloading a local preview instead' : 'Workbook not created yet — downloading a local preview');
+  previewLocalFso();
 }
 
 // Local, offline-capable preview: builds the filled single-sheet .xlsx from the embedded
@@ -2927,8 +2979,16 @@ async function doExport() {
     addHistory(fso, 'Sent with warnings: ' + issues.join('; '));
   }
 
+  // Flush any address typed but not yet turned into a tag (the #1 reason
+  // "the email never arrived" — it was never in the list at all).
+  const pendInp = document.getElementById('email-input');
+  if (pendInp) {
+    const pv = pendInp.value.trim().replace(/,$/, '');
+    if (pv && pv.includes('@')) { emailTags.push(pv); pendInp.value = ''; }
+  }
   const emails = emailTags.slice();
   const wantPdf = exportFmt === 'pdf';
+  lockRatesForExport(fso);
 
   if (!odIsConnected() || !isOnline()) {
     odQueuePush({ type: 'exportFso', bookId: fso.bookId, fsoId: fso.fsoNumber, fmt: exportFmt, emails });
@@ -3049,7 +3109,34 @@ async function generateXLSXFilled(fso) {
   if (parseFloat(fso.accommodation)) N('M68', parseFloat(fso.accommodation));
   S('AE63', fso.signatures.customerName);
 
+  // --- Compute the sheet's own formula cells and write them as VALUES. ---
+  // The template carries CACHED results from the FSO it was cleaned from, and
+  // neither this filler nor Graph's PDF converter recalculates formulas — so
+  // without this, totals show the OLD numbers. Values are computed from this
+  // FSO's data + its (locked) rates, matching the sheet's formulas 1:1.
+  const rt = t.rates;
+  const rnd = v => Math.round((v + Number.EPSILON) * 100) / 100;
+  N('F40', rnd(t.totalKm)); N('R40', rnd(t.totalNT)); N('T40', rnd(t.totalOT15)); N('V40', rnd(t.totalOT20));
+  N('X40', 0); N('Z40', 0); N('AB40', 0);
+  N('I61', rnd(t.totalNT));  N('M61', rnd(rt.nt));     N('R61', rnd(t.engTime));
+  N('I62', rnd(t.totalKm));  N('M62', rnd(rt.kmRate)); N('R62', rnd(t.kmVal));
+  N('I63', rnd(t.totalOT15));N('M63', rnd(rt.ot15));   N('R63', rnd(t.ot15val));
+  N('I64', rnd(t.totalOT20));N('M64', rnd(rt.ot20));   N('R64', rnd(t.ot20val));
+  N('R65', rnd(t.totalMaterials));
+  N('R68', rnd(t.accVal));
+  const sheetSub = t.engTime + t.kmVal + t.ot15val + t.ot20val + t.totalMaterials + t.accVal;
+  const sheetVat = (h.jobType === 'INTERNAL') ? 0 : sheetSub * ((rt.vatPercent === undefined ? 15 : rt.vatPercent) / 100);
+  N('R70', rnd(sheetSub)); N('I70', rnd(sheetVat)); N('R71', rnd(sheetVat)); N('R72', rnd(sheetSub + sheetVat));
+
   files['xl/worksheets/sheet1.xml'] = enc.encode(xml);
+
+  // Ask Excel to do a full recalc on open, so anything we did not cover heals itself.
+  try {
+    let wbXml = dec.decode(files['xl/workbook.xml']);
+    if (wbXml.indexOf('<calcPr') >= 0) wbXml = wbXml.replace(/<calcPr[^>]*\/>/, '<calcPr fullCalcOnLoad="1"/>');
+    else wbXml = wbXml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
+    files['xl/workbook.xml'] = enc.encode(wbXml);
+  } catch (e) { console.warn('calcPr', e); }
 
   // Signature images: image3 = engineer, image4 = customer (transparent placeholder stays if absent)
   const u8 = b => Uint8Array.from(atob(b), c => c.charCodeAt(0));
@@ -3059,6 +3146,88 @@ async function generateXLSXFilled(fso) {
   return fflate.zipSync(files, { level: 6 });
 }
 
+
+// ---- Preview FSO as PDF (no export, no revision, nothing saved) --------
+// Fills the template locally, uploads it to a scratch _previews folder, lets
+// Graph convert it, and shows the PDF in the in-app viewer. The scratch xlsx
+// is overwritten every time; no PDF is stored, so the revision rule is safe.
+async function previewFsoPdf() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (!odIsConnected() || !isOnline()) {
+    toast('PDF preview needs OneDrive + internet — downloading the filled sheet instead');
+    previewLocalFso();
+    return;
+  }
+  toast('Building PDF preview…');
+  try {
+    const book = APP.books[fso.bookId];
+    const bookFolderId = await odEnsureBookFolder(book);
+    const prevFolderId = await odEnsureChildFolder(bookFolderId, '_previews');
+    const xlsxBytes = await generateXLSXFilled(fso);
+    const item = await odPutFile(prevFolderId, fso.fsoNumber + ' preview.xlsx', xlsxBytes,
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const pdfBytes = await gFetchWb('GET', '/me/drive/items/' + item.id + '/content?format=pdf', { raw: true });
+    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(blob);
+    document.getElementById('preview-frame').src = previewUrl;
+    document.getElementById('preview-overlay').classList.add('show');
+  } catch (e) {
+    console.error(e);
+    toast('Preview failed: ' + (e.message || e));
+  }
+}
+
+// ---- "Create on Company System" — one email, signed PDF attached -------
+// To: admin (main). CC: service manager. From: the signed-in engineer
+// (Graph /me/sendMail always sends as the signed-in account).
+// Subject: <job no>, <company>, <job description>, FSO
+async function sendToCompanySystem() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const sp = spCfg();
+  const jobNo = (fso.header.officialNo || '').trim();
+  if (!jobNo) {
+    alert('No official FSO number yet.\n\nRegister the job on SharePoint first and paste the number into FSO Details.');
+    return;
+  }
+  if (!fso.signatures.customer) {
+    if (!confirm('The customer has not signed this FSO yet. Send to the company system anyway?')) return;
+  }
+  if (!sp.adminEmail) {
+    alert('No admin email set.\n\nAdd the admin + service manager emails under Settings → SharePoint → Company system emails.');
+    goTo('screen-settings-sharepoint');
+    return;
+  }
+  if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet — try again when online'); return; }
+  if (!confirm('Email the signed FSO to ' + sp.adminEmail + (sp.managerEmail ? ' (cc ' + sp.managerEmail + ')' : '') + '?')) return;
+  toast('Building signed PDF…');
+  try {
+    lockRatesForExport(fso);
+    const pdf = await odMakeFsoPdf(fso);
+    const h = fso.header;
+    const subject = jobNo + ', ' + (h.customer || '') + ', ' + (h.description || '') + ', FSO';
+    const body = 'Good day ' + (sp.adminName || 'Loriza') + '.\n\nPlease find attached signed FSO for processing.\n\nThank you\n' +
+      (APP.books[fso.bookId].config.engineerName || '') + '\nJohn Thompson (ACTOM Pty Ltd)';
+    toast('Sending email…');
+    await gFetch('POST', '/me/sendMail', { json: {
+      message: {
+        subject: subject,
+        body: { contentType: 'Text', content: body },
+        toRecipients: [{ emailAddress: { address: sp.adminEmail } }],
+        ccRecipients: sp.managerEmail ? [{ emailAddress: { address: sp.managerEmail } }] : [],
+        attachments: [{ '@odata.type': '#microsoft.graph.fileAttachment', name: pdf.name,
+          contentType: 'application/pdf', contentBytes: u8ToB64(pdf.bytes) }]
+      }, saveToSentItems: true } });
+    addHistory(fso, 'Sent to company system: ' + sp.adminEmail + (sp.managerEmail ? ' cc ' + sp.managerEmail : ''));
+    saveFsoData(fso); syncBook(fso.bookId);
+    toast('Sent to ' + sp.adminEmail);
+  } catch (e) {
+    console.error(e);
+    toast('Company-system email failed: ' + (e.message || e));
+  }
+}
 
 function closePreview() {
   document.getElementById('preview-overlay').classList.remove('show');
@@ -3103,33 +3272,29 @@ function saveProfile() {
 }
 
 function renderSettingsRates() {
-  const book = activeBook();
-  if (!book) return;
-  const r = book.config.rates;
-  document.getElementById('sr-ext-nt').value   = r.external.nt;
-  document.getElementById('sr-ext-ot15').value = r.external.ot15;
-  document.getElementById('sr-ext-ot20').value = r.external.ot20;
-  document.getElementById('sr-int-nt').value   = r.internal.nt;
-  document.getElementById('sr-int-ot15').value = r.internal.ot15;
-  document.getElementById('sr-int-ot20').value = r.internal.ot20;
-  document.getElementById('sr-km').value       = r.kmRate;
-  document.getElementById('sr-callout').value  = r.callOutRate;
-  document.getElementById('sr-vat').value      = r.vatPercent;
+  const r = globalRates();
+  document.getElementById('sr-ext-nt').value   = r.external.nt || 0;
+  document.getElementById('sr-ext-ot15').value = r.external.ot15 || 0;
+  document.getElementById('sr-ext-ot20').value = r.external.ot20 || 0;
+  document.getElementById('sr-ext-km').value   = r.external.km || 0;
+  document.getElementById('sr-int-nt').value   = r.internal.nt || 0;
+  document.getElementById('sr-int-ot15').value = r.internal.ot15 || 0;
+  document.getElementById('sr-int-ot20').value = r.internal.ot20 || 0;
+  document.getElementById('sr-int-km').value   = r.internal.km || 0;
+  document.getElementById('sr-callout').value  = r.callOutRate || 0;
+  document.getElementById('sr-vat').value      = (r.vatPercent === undefined ? 15 : r.vatPercent);
 }
 
 function saveRates() {
-  const book = activeBook();
-  if (!book) { goBack(); return; }
-  const r = book.config.rates;
+  const r = globalRates();
   const num = id => parseFloat(document.getElementById(id).value) || 0;
-  r.external = { nt: num('sr-ext-nt') || 660, ot15: num('sr-ext-ot15') || 890, ot20: num('sr-ext-ot20') || 1130 };
-  r.internal = { nt: num('sr-int-nt') || 660, ot15: num('sr-int-ot15') || 890, ot20: num('sr-int-ot20') || 1130 };
-  r.kmRate      = num('sr-km') || 8.50;
+  r.external = { nt: num('sr-ext-nt'), ot15: num('sr-ext-ot15'), ot20: num('sr-ext-ot20'), km: num('sr-ext-km') };
+  r.internal = { nt: num('sr-int-nt'), ot15: num('sr-int-ot15'), ot20: num('sr-int-ot20'), km: num('sr-int-km') };
   r.callOutRate = num('sr-callout');
-  r.vatPercent  = num('sr-vat') || 15;
+  r.vatPercent  = num('sr-vat');
   saveData();
   goBack();
-  toast('Rates saved');
+  toast('Rates saved — applies to FSOs not yet exported');
 }
 
 async function changePIN() {
@@ -3178,7 +3343,22 @@ function toggleTheme() {
 function migrateData() {
   if (!APP.settings) APP.settings = {};
   if (!APP.settings.theme) APP.settings.theme = 'light';
-  if (!APP.settings.office) APP.settings.office = { label: 'John Thompson Office', gps: null };
+  if (!APP.settings.office) APP.settings.office = { label: 'John Thompson, Sacks Circle, Bellville South Industrial, Bellville, Cape Town, 7530, South Africa', gps: null };
+  if (APP.settings.office.label === 'John Thompson Office') APP.settings.office.label = 'John Thompson, Sacks Circle, Bellville South Industrial, Bellville, Cape Town, 7530, South Africa';
+  if (!APP.settings.rates) {
+    // Fresh installs start at zero. Existing installs inherit the active book's old per-book rates once.
+    const b = APP.books && APP.books[APP.activeBookId];
+    const br = b && b.config && b.config.rates;
+    if (br && br.external) {
+      APP.settings.rates = {
+        external: { nt: br.external.nt || 0, ot15: br.external.ot15 || 0, ot20: br.external.ot20 || 0, km: br.kmRate || 0 },
+        internal: { nt: br.internal.nt || 0, ot15: br.internal.ot15 || 0, ot20: br.internal.ot20 || 0, km: br.kmRate || 0 },
+        callOutRate: br.callOutRate || 0, vatPercent: (br.vatPercent === undefined ? 15 : br.vatPercent)
+      };
+    } else APP.settings.rates = defaultRates();
+  }
+  if (APP.settings.rates.external && APP.settings.rates.external.km === undefined) { APP.settings.rates.external.km = APP.settings.rates.kmRate || 0; }
+  if (APP.settings.rates.internal && APP.settings.rates.internal.km === undefined) { APP.settings.rates.internal.km = APP.settings.rates.kmRate || 0; }
   if (!APP.settings.office.roadFactor) APP.settings.office.roadFactor = 1.3;
   if (APP.settings.materialLink === undefined) APP.settings.materialLink = '';
   if (!APP.settings.sharePoint) APP.settings.sharePoint = { registerUrl: '', uploadEnabled: false };
@@ -3187,6 +3367,7 @@ function migrateData() {
   if (!Array.isArray(APP.settings.oneDrive.queue)) APP.settings.oneDrive.queue = [];
   if (!Array.isArray(APP.notes)) APP.notes = [];
   if (!Array.isArray(APP.customers)) APP.customers = [];
+  APP.customers.forEach(c => { if (!Array.isArray(c.contacts)) c.contacts = []; if (!Array.isArray(c.boilers)) c.boilers = []; });
   if (!Array.isArray(APP.departments)) APP.departments = [];
   Object.values(APP.books || {}).forEach(b => {
     if (b.active === undefined) b.active = true;
@@ -3216,6 +3397,7 @@ function migrateData() {
       if (f.accommodation === undefined) f.accommodation = 0;
       if (f.nights === undefined) f.nights = f.accommodation ? 1 : 0;
       if (f.spFolderUrl === undefined) f.spFolderUrl = '';
+      if (f.lockedRates === undefined) f.lockedRates = null;
       if (f.header) {
         if (f.header.officialNo === undefined) f.header.officialNo = '';
         if (f.header.customerId === undefined) f.header.customerId = '';
@@ -3500,9 +3682,24 @@ function mergeImportedCustomers(rows) {
     }).filter(Boolean))].sort((a, b) => a - b);
     nums.forEach(n => {
       const bn = pick(row, ['Boiler ' + n + ' No', 'Boiler ' + n + ' Number', 'Boiler ' + n]);
-      const bd = pick(row, ['Boiler ' + n + ' Description', 'Boiler ' + n + ' Desc']);
+      const bd = pick(row, ['Boiler ' + n + ' Model', 'Boiler ' + n + ' Description', 'Boiler ' + n + ' Desc']);
       if (bn || bd) boilers.push({ boilerNo: bn, description: bd });
     });
+
+    // Contacts from any number of "Contact N Name / Email / Number" column triples
+    const contacts = [];
+    const cnums = [...new Set(keys.map(k => { const m = k.trim().match(/^contact\s*(\d+)/i); return m ? m[1] : null; }).filter(Boolean))].sort((a, b) => a - b);
+    cnums.forEach(n => {
+      const cn = pick(row, ['Contact ' + n + ' Name']);
+      const ce = pick(row, ['Contact ' + n + ' Email']);
+      const cp = pick(row, ['Contact ' + n + ' Number', 'Contact ' + n + ' Phone']);
+      if (cn || ce || cp) contacts.push({ name: cn, email: ce, phone: cp });
+    });
+    // Single-contact header style too
+    const scn = pick(row, ['Contact Name', 'Customer Contact']);
+    const sce = pick(row, ['Contact Email', 'Email']);
+    const scp = pick(row, ['Contact Number', 'Contact Phone', 'Number', 'Phone']);
+    if ((scn || sce || scp) && !contacts.length) contacts.push({ name: scn, email: sce, phone: scp });
 
     const address  = pick(row, ['Site Address', 'Address', 'Address / Site', 'Site']);
     const vatNo    = pick(row, ['VAT Number', 'VAT No', 'VAT No.', 'VAT']);
@@ -3524,11 +3721,13 @@ function mergeImportedCustomers(rows) {
       if (isFinite(km)) c.defaultKm = km;
       if (gps)       c.gps = gps;
       if (boilers.length) c.boilers = boilers;
+      if (contacts.length) c.contacts = contacts;
       updated++;
     } else {
       APP.customers.push({
         id: 'cust-' + uid(), name: name, address: address, vatNo: vatNo,
-        accountNo: accountNo, defaultKm: isFinite(km) ? km : 0, gps: gps, boilers: boilers
+        accountNo: accountNo, defaultKm: isFinite(km) ? km : 0, gps: gps, boilers: boilers,
+        contacts: contacts
       });
       added++;
     }
@@ -3537,7 +3736,7 @@ function mergeImportedCustomers(rows) {
 }
 
 function newCustomer(returnCtx) {
-  const c = { id: 'cust-' + uid(), name: '', address: '', vatNo: '', accountNo: '', defaultKm: 0, gps: null, boilers: [] };
+  const c = { id: 'cust-' + uid(), name: '', address: '', vatNo: '', accountNo: '', defaultKm: 0, gps: null, boilers: [], contacts: [] };
   if (!APP.customers) APP.customers = [];
   APP.customers.push(c);
   saveData();
@@ -3559,6 +3758,8 @@ function renderCustomerEdit() {
   document.getElementById('cust-km').value = c.defaultKm || '';
   document.getElementById('cust-gps-label').textContent = c.gps ? ('Set: ' + c.gps.lat.toFixed(5) + ', ' + c.gps.lng.toFixed(5)) : 'Not set';
   custBoilers = JSON.parse(JSON.stringify(c.boilers || []));
+  custContacts = JSON.parse(JSON.stringify(c.contacts || []));
+  renderCustomerContacts();
   renderCustomerBoilers();
 }
 
@@ -3576,6 +3777,28 @@ function renderCustomerBoilers() {
     '</div>'
   ).join('');
 }
+
+function renderCustomerContacts() {
+  const el = document.getElementById('cust-contacts');
+  if (!el) return;
+  if (!custContacts.length) {
+    el.innerHTML = '<div style="color:var(--grey);font-size:.85rem;padding:6px 0;text-align:center">No contacts — tap + Add</div>';
+    return;
+  }
+  el.innerHTML = custContacts.map((c, i) =>
+    '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">' +
+      '<div class="form-row" style="margin-bottom:6px">' +
+        '<div class="form-group" style="margin:0"><label>Name</label><input class="form-control" value="' + esc(c.name || '') + '" oninput="custContacts[' + i + '].name=this.value"></div>' +
+        '<div class="form-group" style="margin:0"><label>Number</label><input class="form-control" type="tel" value="' + esc(c.phone || '') + '" oninput="custContacts[' + i + '].phone=this.value"></div>' +
+      '</div>' +
+      '<div class="form-group" style="margin:0"><label>Email</label><div style="display:flex;gap:6px">' +
+        '<input class="form-control" type="email" value="' + esc(c.email || '') + '" oninput="custContacts[' + i + '].email=this.value">' +
+        '<button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 12px;color:var(--red)" onclick="removeCustomerContact(' + i + ')">✕</button></div></div>' +
+    '</div>'
+  ).join('');
+}
+function addCustomerContact() { custContacts.push({ name: '', email: '', phone: '' }); renderCustomerContacts(); }
+function removeCustomerContact(i) { custContacts.splice(i, 1); renderCustomerContacts(); }
 
 function addCustomerBoiler() {
   custBoilers.push({ boilerNo: '', description: '' });
@@ -3608,6 +3831,7 @@ function saveCustomer() {
   c.accountNo = document.getElementById('cust-account').value.trim();
   c.defaultKm = parseFloat(document.getElementById('cust-km').value) || 0;
   c.boilers = custBoilers.filter(b => (b.boilerNo || '').trim() || (b.description || '').trim());
+  c.contacts = custContacts.filter(x => (x.name || '').trim() || (x.email || '').trim() || (x.phone || '').trim());
   saveData();
   goBack();
   toast('Customer saved');
@@ -3713,11 +3937,17 @@ function renderSettingsSharePoint() {
   const sp = spCfg();
   document.getElementById('sp-register-url').value = sp.registerUrl || '';
   document.getElementById('sp-upload-toggle').checked = !!sp.uploadEnabled;
+  document.getElementById('sp-admin-name').value = sp.adminName || 'Loriza';
+  document.getElementById('sp-admin-email').value = sp.adminEmail || '';
+  document.getElementById('sp-manager-email').value = sp.managerEmail || '';
 }
 
 function saveSharePointSettings() {
   const sp = spCfg();
   sp.registerUrl = document.getElementById('sp-register-url').value.trim();
+  sp.adminName = document.getElementById('sp-admin-name').value.trim() || 'Loriza';
+  sp.adminEmail = document.getElementById('sp-admin-email').value.trim();
+  sp.managerEmail = document.getElementById('sp-manager-email').value.trim();
   const wasOn = !!sp.uploadEnabled;
   sp.uploadEnabled = document.getElementById('sp-upload-toggle').checked;
   saveData();
@@ -4164,6 +4394,25 @@ async function odEmailFso(fso, recipients, pdfBytes) {
   if (skipped.length) toast('Emailed — too large to attach: ' + skipped.join(', '));
 }
 
+// Graph workbook calls right after a file is created often fail transiently
+// (404 "resource not found" while the workbook service warms up, 423/429/503
+// under load). gFetchWb retries those; anything else is a real error.
+async function gFetchWb(method, path, opts, tries) {
+  tries = tries || 6;
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try { return await gFetch(method, path, opts); }
+    catch (e) {
+      lastErr = e;
+      const m = String(e.message || '');
+      const transient = /Graph (404|409|423|429|500|502|503|504)/.test(m);
+      if (!transient || i === tries - 1) throw e;
+      await new Promise(r => setTimeout(r, 1200 + i * 800));
+    }
+  }
+  throw lastErr;
+}
+
 // ---- Workbook naming ---------------------------------------------------
 function workbookName(book) {
   return 'FSO work book ' + book.config.fsoRangeStart + '-' + book.config.fsoRangeEnd;
@@ -4192,12 +4441,13 @@ async function odCreateWorkbook(book) {
   const wbBase = '/me/drive/items/' + itemId + '/workbook';
   // The template ships with one master sheet (named "18"). Rename it to TEMPLATE and keep it
   // as the copy source for every FSO sheet (kept visible until the first real sheet exists).
-  const list = await gFetch('GET', wbBase + '/worksheets');
+  // gFetchWb retries while the workbook service warms up after the upload.
+  const list = await gFetchWb('GET', wbBase + '/worksheets');
   const master = list.value[0];
   if (master && master.name !== 'TEMPLATE') {
-    try { await gFetch('PATCH', wbBase + '/worksheets/' + master.id, { json: { name: 'TEMPLATE' } }); } catch (e) {}
+    await gFetchWb('PATCH', wbBase + "/worksheets('" + encodeURIComponent(master.name) + "')", { json: { name: 'TEMPLATE' } });
   }
-  try { await odEnsureAllSheet(itemId, book); } catch (e) { console.warn('All sheet', e); }
+  await odEnsureAllSheet(itemId, book);
   if (odSheetMode() === 'upfront') {
     const nums = orderedFsoNumbers(book);
     for (let i = 0; i < nums.length; i++) {
@@ -4226,15 +4476,15 @@ function allRowFor(book, fsoNumber) {
 }
 async function odEnsureAllSheet(itemId, book) {
   const wbBase = '/me/drive/items/' + itemId + '/workbook';
-  const list = await gFetch('GET', wbBase + '/worksheets');
+  const list = await gFetchWb('GET', wbBase + '/worksheets');
   if ((list.value || []).some(w => w.name === 'All')) return;
-  const ws = await gFetch('POST', wbBase + '/worksheets/add', { json: { name: 'All' } });
-  try { await gFetch('PATCH', wbBase + '/worksheets/' + ws.id + '/position', { json: { position: 0 } }); } catch (e) {}
+  await gFetchWb('POST', wbBase + '/worksheets/add', { json: { name: 'All' } });
+  try { await gFetchWb('PATCH', wbBase + "/worksheets('All')/position", { json: { position: 0 } }); } catch (e) { console.warn('All position', e); }
   const headers = [['Book ref', 'FSO No', 'Customer', 'Date', 'NT hrs', 'OT 1.5 hrs', 'OT 2.0 hrs', 'Km', 'Materials R', 'Sheet']];
-  await gFetch('PATCH', wbBase + "/worksheets('All')/range(address='A1:J1')", { json: { values: headers } });
+  await gFetchWb('PATCH', wbBase + "/worksheets('All')/range(address='A1:J1')", { json: { values: headers } });
   const refs = orderedFsoNumbers(book).map(n => [n]);
   if (refs.length) {
-    await gFetch('PATCH', wbBase + "/worksheets('All')/range(address='A2:A" + (1 + refs.length) + "')", { json: { values: refs } });
+    await gFetchWb('PATCH', wbBase + "/worksheets('All')/range(address='A2:A" + (1 + refs.length) + "')", { json: { values: refs } });
   }
 }
 // Write (or refresh) one FSO's formula row on the All sheet. Safe to call
@@ -4256,8 +4506,8 @@ async function odWriteAllRow(itemId, book, fsoNumber) {
     '=HYPERLINK("#' + s + '!A1","Open ▸")'
   ]];
   try {
-    await gFetch('PATCH', wbBase + "/worksheets('All')/range(address='B" + r + ":J" + r + "')", { json: { formulas: f } });
-  } catch (e) { console.warn('All row', fsoNumber, e); }
+    await gFetchWb('PATCH', wbBase + "/worksheets('All')/range(address='B" + r + ":J" + r + "')", { json: { formulas: f } });
+  } catch (e) { console.warn('All row', fsoNumber, e); toast('All-sheet row failed for ' + fsoNumber); }
 }
 
 // Ensure a worksheet named `name` exists. Copies the TEMPLATE sheet and renames the copy.
@@ -4265,27 +4515,28 @@ async function odWriteAllRow(itemId, book, fsoNumber) {
 // Pass book + fsoNumber so the sheet's formula row on the All sheet is written once it exists.
 async function odEnsureSheet(itemId, name, book, fsoNumber) {
   const wbBase = '/me/drive/items/' + itemId + '/workbook';
-  const list = await gFetch('GET', wbBase + '/worksheets');
+  const wsAddr = n => wbBase + "/worksheets('" + encodeURIComponent(n) + "')";
+  const list = await gFetchWb('GET', wbBase + '/worksheets');
   const sheets = list.value || [];
   if (sheets.some(w => w.name === name)) {
     if (book && fsoNumber && sheets.some(w => w.name === 'All')) await odWriteAllRow(itemId, book, fsoNumber);
     return;
   }
-  const tmpl = sheets.find(w => w.name === 'TEMPLATE') || sheets[0];
+  const tmpl = sheets.find(w => w.name === 'TEMPLATE') || sheets.find(w => w.name !== 'All') || sheets[0];
   const before = sheets.map(w => w.name);
-  await gFetch('POST', wbBase + '/worksheets/' + tmpl.id + '/copy', { json: { positionType: 'End' } });
-  const after = await gFetch('GET', wbBase + '/worksheets');
+  await gFetchWb('POST', wsAddr(tmpl.name) + '/copy', { json: { positionType: 'End' } });
+  const after = await gFetchWb('GET', wbBase + '/worksheets');
   const fresh = (after.value || []).find(w => before.indexOf(w.name) < 0);
   if (fresh) {
-    try { await gFetch('PATCH', wbBase + '/worksheets/' + fresh.id, { json: { name: name, visibility: 'Visible' } }); } catch (e) {}
+    await gFetchWb('PATCH', wsAddr(fresh.name), { json: { name: name, visibility: 'Visible' } });
   }
   // Once at least one real sheet exists, hide the TEMPLATE source.
-  if (tmpl && tmpl.name === 'TEMPLATE' && (after.value || []).length > 1) {
-    try { await gFetch('PATCH', wbBase + '/worksheets/' + tmpl.id, { json: { visibility: 'Hidden' } }); } catch (e) {}
+  if (tmpl && tmpl.name === 'TEMPLATE') {
+    try { await gFetchWb('PATCH', wsAddr('TEMPLATE'), { json: { visibility: 'Hidden' } }); } catch (e) { console.warn('hide TEMPLATE', e); }
   }
   // New sheet now exists → its All-sheet formula row can be written safely.
   if (book && fsoNumber) {
-    try { await odEnsureAllSheet(itemId, book); await odWriteAllRow(itemId, book, fsoNumber); } catch (e) { console.warn('All row', e); }
+    try { await odEnsureAllSheet(itemId, book); await odWriteAllRow(itemId, book, fsoNumber); } catch (e) { console.warn('All row', e); toast('All-sheet update failed (sheet created OK)'); }
   }
 }
 
@@ -4345,6 +4596,15 @@ function fsoSheetWrites(fso) {
   one('I68', parseFloat(fso.nights) || '');
   one('M68', parseFloat(fso.accommodation) || '');
   one('AE63', fso.signatures.customerName || '');
+
+  // Rates into the costing block, so the sheet's own formulas price THIS FSO
+  // with its locked rates (Excel online recalculates live — unlike the PDF path).
+  const rt = t.rates;
+  one('M61', rt.nt || 0);
+  one('M62', rt.kmRate || 0);
+  one('M63', rt.ot15 || 0);
+  one('I64', t.totalOT20 || 0);
+  one('M64', rt.ot20 || 0);
   return W;
 }
 
@@ -4362,7 +4622,7 @@ async function odExportFso(fso) {
   const base = "/me/drive/items/" + itemId + "/workbook/worksheets('" + sheet + "')/range(address='";
   const writes = fsoSheetWrites(fso);
   for (const w of writes) {
-    await gFetch('PATCH', base + w.address + "')", { json: { values: w.values } });
+    await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values } });
   }
   return book.config.webUrl;
 }
@@ -4378,7 +4638,7 @@ function buildIndex() {
     settings: {
       theme: APP.settings.theme, fontSize: APP.settings.fontSize,
       office: APP.settings.office, materialLink: APP.settings.materialLink,
-      sharePoint: APP.settings.sharePoint
+      sharePoint: APP.settings.sharePoint, rates: APP.settings.rates
     },
     books: Object.values(APP.books).map(b => ({
       id: b.id, name: workbookName(b),
@@ -4440,6 +4700,7 @@ async function odPullActive(idx) {
   if (idx.customers) APP.customers = idx.customers;
   if (idx.departments) APP.departments = idx.departments;
   if (idx.settings && idx.settings.sharePoint) APP.settings.sharePoint = idx.settings.sharePoint;
+  if (idx.settings && idx.settings.rates) APP.settings.rates = idx.settings.rates;
   for (const bm of (idx.books || [])) {
     if (!bm.active) continue;
     try {
