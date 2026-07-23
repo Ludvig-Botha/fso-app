@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.2.0 — 2026-07-21
+- FIX (406 PDF, real root cause): FSO documents are now built SERVER-SIDE.
+  The app uploads the pristine template (written by Excel itself) and fills it
+  through the Graph workbook API, instead of rebuilding the .xlsx in the browser
+  and sending that to Microsoft's converter — which rejected it with 406
+  UnsupportedMediaType. Preview FSO (PDF), the PDF copy on export, and the
+  company-system email all use this path now.
+- Because Excel Online owns the file, its own formulas recalculate live, so
+  totals are always right, and the sheet is renamed to the job number instead of
+  staying "18".
+- Naming: job folder is now "<Job number> <Company> <Job description>"; the
+  workbook/PDF inside use the same name with " FSO" appended. Illegal characters
+  stripped and length-capped so long descriptions can't break uploads.
+- FIX: "Create on Company System" now always sends. A PDF-conversion failure
+  falls back to attaching the workbook and reports the reason, instead of
+  silently aborting before sendMail.
+- Book workbooks left half-built by earlier versions (single "18" sheet, no All
+  sheet) now self-repair on the next export. SW cache v14.
+
 ## v2.1.1 — 2026-07-21
 - FIX (406 PDF preview): removed the calcPr hand-edit and now strip the stale
   calcChain.xml before export. That inconsistency made the Office PDF-conversion

@@ -1284,7 +1284,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAAANSs0lwAAAAAAAAAAAAAAAAGAAAAX3JlbHMvUEsDB
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.2.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -3176,9 +3176,9 @@ async function previewFsoPdf() {
     const book = APP.books[fso.bookId];
     const bookFolderId = await odEnsureBookFolder(book);
     const prevFolderId = await odEnsureChildFolder(bookFolderId, '_previews');
-    const xlsxBytes = await generateXLSXFilled(fso);
-    const item = await odPutFile(prevFolderId, fso.fsoNumber + ' preview.xlsx', xlsxBytes,
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    // Same server-side builder as the real export, so the preview is a true
+    // preview of what will be sent (and it converts — no 406).
+    const item = await odBuildFsoXlsx(fso, prevFolderId, fsoDocTitle(fso) + ' PREVIEW.xlsx');
     const pdfBytes = await gFetchWb('GET', '/me/drive/items/' + item.id + '/content?format=pdf', { raw: true });
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -3217,7 +3217,24 @@ async function sendToCompanySystem() {
   toast('Building signed PDF…');
   try {
     lockRatesForExport(fso);
-    const pdf = await odMakeFsoPdf(fso);
+    // The PDF is preferred, but a conversion failure must not stop the job
+    // reaching Admin — fall back to the workbook so the email always goes.
+    let att, pdf = null;
+    try {
+      pdf = await odMakeFsoPdf(fso);
+      att = { '@odata.type': '#microsoft.graph.fileAttachment', name: pdf.name,
+              contentType: 'application/pdf', contentBytes: u8ToB64(pdf.bytes) };
+    } catch (e) {
+      console.error('pdf for email', e);
+      toast('PDF failed (' + (e.message || e) + ') — attaching the workbook instead');
+      const folderId = await odFsoJobFolder(fso);
+      const xname = fsoDocTitle(fso) + ' FSO.xlsx';
+      const item = await odBuildFsoXlsx(fso, folderId, xname);
+      const xb = await gFetchWb('GET', '/me/drive/items/' + item.id + '/content', { raw: true });
+      att = { '@odata.type': '#microsoft.graph.fileAttachment', name: xname,
+              contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              contentBytes: u8ToB64(xb) };
+    }
     const h = fso.header;
     const subject = jobNo + ', ' + (h.customer || '') + ', ' + (h.description || '') + ', FSO';
     const body = 'Good day ' + (sp.adminName || 'Loriza') + '.\n\nPlease find attached signed FSO for processing.\n\nThank you\n' +
@@ -3229,8 +3246,7 @@ async function sendToCompanySystem() {
         body: { contentType: 'Text', content: body },
         toRecipients: [{ emailAddress: { address: sp.adminEmail } }],
         ccRecipients: sp.managerEmail ? [{ emailAddress: { address: sp.managerEmail } }] : [],
-        attachments: [{ '@odata.type': '#microsoft.graph.fileAttachment', name: pdf.name,
-          contentType: 'application/pdf', contentBytes: u8ToB64(pdf.bytes) }]
+        attachments: [att]
       }, saveToSentItems: true } });
     addHistory(fso, 'Sent to company system: ' + sp.adminEmail + (sp.managerEmail ? ' cc ' + sp.managerEmail : ''));
     saveFsoData(fso); syncBook(fso.bookId);
@@ -4276,6 +4292,65 @@ async function odPutFile(folderId, name, bytes, mime) {
     { body: bytes, headers: { 'Content-Type': mime } });
 }
 
+// ---- Document naming ----------------------------------------------------
+// Folder + file naming: "<Job number> <Company> <Job description>"
+// (the workbook/PDF get " FSO" appended). Windows/SharePoint-illegal
+// characters are stripped and the whole thing is length-capped so long
+// descriptions can never break the upload.
+function sanitizeName(s, max) {
+  return String(s || '')
+    .replace(/[\\/:*?"<>|#%~&{}]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max || 90);
+}
+function fsoDocTitle(fso) {
+  const h = fso.header || {};
+  const parts = [(h.officialNo || '').trim() || fso.fsoNumber];
+  if (h.customer) parts.push(h.customer);
+  if (h.description) parts.push(h.description);
+  return sanitizeName(parts.join(' '), 110) || fso.fsoNumber;
+}
+
+// ---- Build an FSO workbook SERVER-SIDE ----------------------------------
+// Critical: we upload the PRISTINE template bytes (written by Excel itself)
+// and then populate cells through the Graph workbook API. We never send an
+// app-rezipped file to the Office conversion service — that is what made
+// /content?format=pdf fail with HTTP 406 (UnsupportedMediaType).
+// Bonus: Excel Online recalculates the sheet's own formulas live, so totals
+// are always correct, and we can rename the sheet to the job number.
+async function odBuildFsoXlsx(fso, folderId, fileName) {
+  const tplBytes = Uint8Array.from(atob(TEMPLATE_XLSX_B64), c => c.charCodeAt(0));
+  const item = await odPutFile(folderId, fileName, tplBytes,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  const itemId = item.id;
+  const wbBase = '/me/drive/items/' + itemId + '/workbook';
+  const sessionId = await odWorkbookSession(itemId);
+  const hdr = { 'workbook-session-id': sessionId };
+  try {
+    // Rename the template's stock sheet ("18") to the job number.
+    const sheetName = sanitizeName((fso.header.officialNo || '').trim() || fso.fsoNumber, 31)
+      .replace(/[\[\]]/g, '') || fso.fsoNumber;
+    const list = await gFetchWb('GET', wbBase + '/worksheets', { headers: hdr });
+    const first = (list.value || [])[0];
+    if (first && first.name !== sheetName) {
+      await gFetchWb('PATCH', wbBase + "/worksheets('" + encodeURIComponent(first.name) + "')",
+        { json: { name: sheetName }, headers: hdr });
+    }
+    // Populate every range from the same writer used for the book workbook.
+    const base = wbBase + "/worksheets('" + encodeURIComponent(sheetName) + "')/range(address='";
+    for (const w of fsoSheetWrites(fso)) {
+      await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values }, headers: hdr });
+    }
+    // Signature images can't go through the workbook API; the sheet keeps the
+    // template's placeholders. The signed record is the PDF built from here.
+    await gFetchWb('POST', wbBase + '/application/calculate', { json: { calculationType: 'FullAndForce' }, headers: hdr });
+  } finally {
+    await odCloseSession(itemId, sessionId);
+  }
+  return item;
+}
+
 // ---- PDF copy of an FSO -------------------------------------------------
 // Fills the local single-sheet template, uploads it into the FSO's own job
 // folder (created under the book folder), and lets Graph convert it
@@ -4292,7 +4367,8 @@ function fsoDocBaseName(fso) {
 async function odFsoJobFolder(fso) {
   const book = APP.books[fso.bookId];
   const bookFolderId = await odEnsureBookFolder(book);
-  return odEnsureChildFolder(bookFolderId, fsoDocBaseName(fso));
+  // Folder: "<Job number> <Company> <Job description>"
+  return odEnsureChildFolder(bookFolderId, fsoDocTitle(fso));
 }
 // Next free PDF name in a folder, given the immutable-revision rule.
 async function odNextPdfName(folderId, base) {
@@ -4308,18 +4384,20 @@ async function odNextPdfName(folderId, base) {
 }
 async function odMakeFsoPdf(fso) {
   const folderId = await odFsoJobFolder(fso);
-  const base = fsoDocBaseName(fso);
-  const xlsxBytes = await generateXLSXFilled(fso);
-  // Working xlsx = latest data, always overwritten.
-  const item = await odPutFile(folderId, base + '.xlsx', xlsxBytes,
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  const pdfBytes = await gFetch('GET', '/me/drive/items/' + item.id + '/content?format=pdf', { raw: true });
-  const pdfName = await odNextPdfName(folderId, base);
+  const title = fsoDocTitle(fso);                 // "<job no> <company> <description>"
+  const xlsxName = title + ' FSO.xlsx';
+  // Working xlsx = latest data, always overwritten. Built server-side from the
+  // pristine template so the Office converter accepts it (no 406).
+  const item = await odBuildFsoXlsx(fso, folderId, xlsxName);
+  const pdfBytes = await gFetchWb('GET', '/me/drive/items/' + item.id + '/content?format=pdf', { raw: true });
+  const pdfName = await odNextPdfName(folderId, title + ' FSO');
   await odPutFile(folderId, pdfName, pdfBytes, 'application/pdf');
-  if (pdfName !== base + '.pdf') addHistory(fso, 'PDF revision exported: ' + pdfName + ' (original untouched)');
+  if (pdfName !== title + ' FSO.pdf') addHistory(fso, 'PDF revision exported: ' + pdfName + ' (original untouched)');
   // Mirror to the FSO's SharePoint job folder, if enabled + linked.
-  try { await spUploadExport(fso, pdfName, pdfBytes, base + '.xlsx', xlsxBytes); }
-  catch (e) { console.warn('sharepoint upload', e); toast('SharePoint upload failed (OneDrive copy saved): ' + (e.message || e)); }
+  try {
+    const xlsxBytes = await gFetchWb('GET', '/me/drive/items/' + item.id + '/content', { raw: true });
+    await spUploadExport(fso, pdfName, pdfBytes, xlsxName, xlsxBytes);
+  } catch (e) { console.warn('sharepoint upload', e); toast('SharePoint upload failed (OneDrive copy saved): ' + (e.message || e)); }
   return { bytes: pdfBytes, name: pdfName };
 }
 
@@ -4469,6 +4547,31 @@ async function odCreateWorkbook(book) {
   }
   return { itemId, webUrl: item.webUrl };
 }
+
+// Repair a book workbook left half-built by an earlier version: make sure a
+// TEMPLATE sheet and the All sheet exist. Safe + cheap to call before writes.
+async function odRepairWorkbook(book) {
+  const itemId = book.config.xlsxItemId;
+  if (!itemId) return;
+  const wbBase = '/me/drive/items/' + itemId + '/workbook';
+  try {
+    const list = await gFetchWb('GET', wbBase + '/worksheets');
+    const names = (list.value || []).map(w => w.name);
+    if (!names.length) return;
+    // Stock template sheet still called "18" (or anything that isn't TEMPLATE/All
+    // and is the only sheet) → rename it to TEMPLATE so sheet copies work.
+    if (names.indexOf('TEMPLATE') < 0) {
+      const src = names.filter(n => n !== 'All')[0];
+      if (src) {
+        await gFetchWb('PATCH', wbBase + "/worksheets('" + encodeURIComponent(src) + "')",
+          { json: { name: 'TEMPLATE' } });
+        addHistory2(book, 'Workbook repaired: template sheet renamed');
+      }
+    }
+    if (names.indexOf('All') < 0) await odEnsureAllSheet(itemId, book);
+  } catch (e) { console.warn('repair workbook', e); }
+}
+function addHistory2(book, msg) { console.log('[book ' + book.id + '] ' + msg); }
 
 // ---- "All" summary sheet ------------------------------------------------
 // One row per FSO in the book. Every data cell is a FORMULA pulling from that
@@ -4628,6 +4731,9 @@ async function odExportFso(fso) {
     const r = await odCreateWorkbook(book);
     book.config.xlsxItemId = r.itemId; book.config.webUrl = r.webUrl; saveData();
   }
+  // Self-heal: workbooks made by earlier versions can be left with only the
+  // stock template sheet ("18") and no All sheet. Repair before writing.
+  await odRepairWorkbook(book);
   const itemId = book.config.xlsxItemId;
   const sheet = sheetNameFor(fso.fsoNumber);
   await odEnsureSheet(itemId, sheet, book, fso.fsoNumber);
