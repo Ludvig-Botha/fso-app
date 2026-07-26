@@ -1,5 +1,42 @@
 # Changelog
 
+## v2.5.0 — 2026-07-26
+- FIX (423 resourceLocked / no PDFs): FSO PDFs are built from a locally
+  generated workbook again, then uploaded and converted. The server-side
+  builder held a persistent workbook session on the file, so the PDF
+  conversion that ran straight afterwards hit a locked resource. It also could
+  never embed the signature images — the Graph workbook API cannot insert
+  pictures — so even a successful PDF would have been unsigned.
+- FIX (400 "Resource not found for the segment 'copy'"): worksheet copy now
+  uses the /worksheets/{name}/copy form. The parenthesised worksheets('name')
+  form does not resolve the copy action, which is why "Send to workbook" failed
+  and jobs were never added to the workbook alongside the All and TEMPLATE tabs.
+- FIX (leftover template data): the template carried cached formula results
+  from the FSO it was cleaned from (100 km, 5 h, R3 300, R500...). Those cached
+  values are now stripped, so a new workbook starts genuinely empty. The
+  template's hard-coded rates were cleared too.
+- FIX (logos): the John Thompson logo was lost during the earlier template
+  clean-up. Both logos are now anchored in their proper blocks — ACTOM across
+  the top, John Thompson at A11.
+- FIX (dates): the engineer's date now uses the same dd/mm/yyyy format as the
+  customer's date-signed. Both previously came from different sources.
+- FIX (stale signatures): the template's signature placeholders are now blank
+  transparent images, so an unsigned FSO can never show someone else's mark.
+- NEW: Settings > About > Clear app data. Warns with a count of what will be
+  lost, writes a timestamped .zip backup to OneDrive (FSO App > Backups)
+  containing all data plus every signature and photo, then requires typing
+  ERASE before wiping the device.
+- NEW: Settings > About > Restore from OneDrive backup — pick any saved backup
+  and put the device back exactly as it was.
+- Books now number automatically: 1-50, then 51-100, 101-150 and so on. The
+  next range is pre-filled, duplicate ranges are refused and overlapping ranges
+  warn, so two books can never share a workbook name or folder.
+- The book list shows the date each book was created.
+- Customer import now has separate Street Address / City / Province / Country
+  columns, each printing on its own line. The site field on an FSO is
+  multi-line and is filled from the customer record when one is selected.
+- SW cache v17.
+
 ## v2.4.0 — 2026-07-26
 - Auto-update fixed. Three separate causes: (1) the service worker was
   registered without updateViaCache:'none', so the browser could serve sw.js
