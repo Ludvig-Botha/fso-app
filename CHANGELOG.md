@@ -1,5 +1,32 @@
 # Changelog
 
+## v2.3.0 — 2026-07-25
+- ROOT CAUSE FOUND (Graph 501 unsupportedWorkbook): the embedded FSO template
+  still contained an EXTERNAL LINK back to "47700C-47750C Ludvig Botha FSO
+  Sheet.xlsx", left over from when the clean sheet was extracted. The Graph
+  Excel API refuses to open any workbook with external references, so EVERY
+  workbook API call had been failing since day one — which is why sheets stayed
+  named "18", stayed empty, kept old data, no All sheet was built, no PDF was
+  produced, and the company-system email never sent.
+- The template is now cleaned: external links removed, broken in-cell "rich
+  value" images removed (they rendered #VALUE! in A1/A11), stale calcChain and
+  metadata dropped, and the letterhead re-anchored as a normal picture so it
+  still prints. Validated: opens cleanly, all 23 formulas intact, no #VALUE!.
+- FIX: customer import skipped every row — it looked for a "Customer Name"
+  column but the template ships "Company Name". Header matching is now
+  forgiving, and a failed import lists the columns it actually found.
+- FIX: "Date Signed" showed the job start date (template pulled =X13). It now
+  shows the real customer signature date.
+- Exported PDFs are emailed to the engineer automatically (Settings → Engineer
+  Profile → My email address).
+- Site address now prints one line per part (street / city / province /
+  country), accepting either line breaks or a comma-separated address.
+- New "Workbook Folder" button on the FSO screen, beside "Open Job Folder".
+- Settings → SharePoint is now "SharePoint & OneDrive folders", with a field for
+  the OneDrive FSO App folder URL.
+- Confirmed already correct: internal jobs mark materials up 5% (external 30%).
+- SW cache v15.
+
 ## v2.2.0 — 2026-07-21
 - FIX (406 PDF, real root cause): FSO documents are now built SERVER-SIDE.
   The app uploads the pristine template (written by Excel itself) and fills it
