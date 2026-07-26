@@ -550,6 +550,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <option value="INTERNAL">INTERNAL</option>
       </select>
     </div>
+    <div id="hf-rate-hint" style="font-size:.74rem;color:var(--grey);margin:-6px 2px 12px;line-height:1.4"></div>
     <div class="form-group" id="hf-dept-group" style="display:none">
       <label>Department</label>
       <div style="display:flex;gap:6px">
@@ -1118,6 +1119,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         Used by the "Create on Company System" button — one email with the signed PDF,
         sent from your own mailbox to Admin, with the Service Manager in CC.
       </p>
+      <div id="sp-mailbox-note" style="padding:9px 10px;border-radius:10px;background:var(--blue-light);font-size:.76rem;line-height:1.5;margin-bottom:10px"></div>
       <div class="form-row">
         <div class="form-group" style="margin-bottom:8px"><label>Admin first name</label><input class="form-control" id="sp-admin-name" placeholder="Loriza"></div>
         <div class="form-group" style="margin-bottom:8px"><label>Admin email (To)</label><input class="form-control" id="sp-admin-email" type="email" placeholder="admin@…"></div>
@@ -1359,7 +1361,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.8.2';
+const APP_VERSION = '2.9.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2515,6 +2517,7 @@ function renderHeaderForm() {
   document.getElementById('hf-time').innerHTML = timeOptions(h.time || '');
   document.getElementById('hf-site').value = h.addressSite || '';
   document.getElementById('hf-jobtype').value = (h.jobType === 'INTERNAL') ? 'INTERNAL' : 'EXTERNAL';
+  showRateSetHint(fso);
   document.getElementById('hf-dept-group').style.display = (h.jobType === 'INTERNAL') ? 'block' : 'none';
   document.getElementById('hf-date').value = h.date || '';
   renderJobMode(fso);
@@ -2580,6 +2583,38 @@ function onQuoteNoInput() {
 
 function onJobTypeChange(val) {
   document.getElementById('hf-dept-group').style.display = (val === 'INTERNAL') ? 'block' : 'none';
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const want = (val === 'INTERNAL') ? 'INTERNAL' : 'EXTERNAL';
+  // Rates are frozen once a job has been built/exported. Changing the job type
+  // afterwards would otherwise appear to do nothing at all, so ask outright.
+  if (fso.lockedRates && fso.header.jobType !== want) {
+    if (confirm('This FSO already has locked-in rates from when its documents were created.\n\n' +
+                'Apply the ' + (want === 'INTERNAL' ? 'Internal' : 'External') + ' rates instead?')) {
+      fso.lockedRates = null;
+      addHistory(fso, 'Rates unlocked — job type changed to ' + want);
+      saveFsoData(fso);
+      toast((want === 'INTERNAL' ? 'Internal' : 'External') + ' rates will now apply');
+    } else {
+      toast('Keeping the previously locked rates');
+    }
+  }
+  // Reflect the change immediately so the preview figures are not stale.
+  fso.header.jobType = want;
+  saveFsoData(fso);
+  showRateSetHint(fso);
+}
+
+// Small live hint under the Job Type picker so the active rate set is never a
+// mystery — this is what was missing when switching External to Internal.
+function showRateSetHint(fso) {
+  const el = document.getElementById('hf-rate-hint');
+  if (!el) return;
+  const r = fsoRates(fso);
+  const set = (fso.header.jobType === 'INTERNAL') ? 'Internal' : 'External';
+  el.innerHTML = set + ' rates' + (fso.lockedRates ? ' <strong>(locked at export)</strong>' : '') +
+    ' — NT R' + (r.nt || 0) + ' · OT1.5 R' + (r.ot15 || 0) +
+    ' · OT2.0 R' + (r.ot20 || 0) + ' · km R' + (r.kmRate || 0);
 }
 
 function onCustomerPick(custId) {
@@ -3536,7 +3571,11 @@ async function sendAdminEmails() {
 async function sendFsoEmail(fso, to, cc, kind) {
   if (!(fso.header.officialNo || '').trim()) { alert('Enter the official FSO number first.'); return; }
   if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
-  if (!confirm('Send to ' + to.join(', ') + (cc.length ? '\ncc ' + cc.join(', ') : '') + '?')) return;
+  const looksOk = a => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a);
+  const bad = to.concat(cc).filter(a => !looksOk(a));
+  if (bad.length) { alert('These addresses look wrong:\n\n' + bad.join('\n') + '\n\nFix them and try again.'); return; }
+  if (!confirm('Send from ' + (odAccount ? odAccount.username : 'your account') + '\n\n' +
+               'To: ' + to.join(', ') + (cc.length ? '\nCc: ' + cc.join(', ') : '') + '\n\nSend now?')) return;
   try {
     lockRatesForExport(fso);
     toast('Building PDF…');
@@ -3547,7 +3586,12 @@ async function sendFsoEmail(fso, to, cc, kind) {
     addHistory(fso, (kind === 'admin' ? 'Admin' : 'Customer') + ' email sent to ' + to.join(', ') +
       (cc.length ? ' cc ' + cc.join(', ') : ''));
     saveFsoData(fso); syncBook(fso.bookId).catch(e => logError('syncBook', e));
-    toast('Email sent');
+    // Spell out what actually went where — a silent "sent" is impossible to
+    // troubleshoot when one recipient does not receive it.
+    alert('Email sent from ' + (odAccount ? odAccount.username : 'your signed-in account') + '\n\n' +
+          'To:  ' + to.join(', ') + '\n' +
+          (cc.length ? 'Cc:  ' + cc.join(', ') + '\n' : '') +
+          '\nIf a recipient does not receive it, check the address above and their junk folder.');
   } catch (e) {
     console.error(e);
     logError('sendFsoEmail/' + kind, e);
@@ -4394,6 +4438,14 @@ function renderSettingsSharePoint() {
   document.getElementById('sp-admin-email').value = sp.adminEmail || '';
   document.getElementById('sp-manager-email').value = sp.managerEmail || '';
   document.getElementById('sp-onedrive-url').value = sp.oneDriveFolderUrl || '';
+  const note = document.getElementById('sp-mailbox-note');
+  if (note) {
+    note.innerHTML = odIsConnected()
+      ? ('All FSO emails are sent <strong>from ' + esc(odAccount ? odAccount.username : '') + '</strong>, ' +
+         'because that is the account signed in to OneDrive. To send from your work address instead, ' +
+         'sign out under Settings → OneDrive Sync and sign in with your work account.')
+      : 'Not signed in. FSO emails are sent from whichever account is signed in under Settings → OneDrive Sync.';
+  }
 }
 
 function saveSharePointSettings() {

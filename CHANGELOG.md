@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.9.0 — 2026-07-26
+- FIX (rates did not change on External -> Internal): once a job's documents
+  have been created, its rates are LOCKED so an exported FSO can never change
+  price retrospectively. Switching job type afterwards therefore appeared to do
+  nothing. Now, changing the job type on a job with locked rates asks whether to
+  apply the other rate set, and a live hint under the Job Type picker always
+  shows which set is in force and whether it is locked, with the actual figures.
+- Emails now report exactly what happened: the confirmation names the sending
+  mailbox and lists To and Cc; after sending, a summary shows the same detail.
+  Addresses are validated before sending, so a typo is caught rather than
+  silently going nowhere.
+- Settings > SharePoint & OneDrive now states which mailbox FSO emails are sent
+  from, and how to change it.
+
 ## v2.8.2 — 2026-07-26
 - Your latest template embedded, with the logos moved to the new ranges and
   filling them completely:
