@@ -118,8 +118,9 @@ textarea.form-control{min-height:80px;resize:vertical}
 .pin-dots{display:flex;gap:16px;justify-content:center;margin:32px 0}
 .pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--blue);background:transparent;transition:background .15s}
 .pin-dot.filled{background:var(--blue)}
-.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;margin:0 auto}
-.pin-key{height:72px;border-radius:16px;border:1.5px solid var(--border);background:#fff;font-family:inherit;font-size:1.6rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s,transform .1s;box-shadow:var(--shadow)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:264px;margin:0 auto;justify-items:center}
+.pin-pad>button{width:100%}
+.pin-key{aspect-ratio:1;height:auto;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-family:inherit;font-size:1.6rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s,transform .1s;box-shadow:var(--shadow)}
 .pin-key:active{background:var(--blue-light);transform:scale(.96)}
 .pin-key.del{font-size:1.2rem;color:var(--grey)}
 .pin-key.empty{background:transparent;border-color:transparent;box-shadow:none;cursor:default}
@@ -505,6 +506,32 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <label>Address / Site</label>
       <input class="form-control" id="hf-site" placeholder="Site address">
     </div>
+    <div class="card" id="hf-mode-card" style="margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:8px">Job basis</div>
+      <div style="display:flex;gap:8px;margin-bottom:4px">
+        <button id="hf-mode-callout" class="btn btn-secondary btn-sm" style="flex:1" onclick="setJobMode('CALLOUT')">Call out</button>
+        <button id="hf-mode-quote" class="btn btn-secondary btn-sm" style="flex:1" onclick="setJobMode('QUOTE')">Quote</button>
+      </div>
+      <p id="hf-mode-note" style="font-size:.74rem;color:var(--grey);line-height:1.5;margin-top:6px"></p>
+    </div>
+    <div class="card" id="hf-quote-card" style="display:none;margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:8px">Quotation</div>
+      <div class="form-group">
+        <label>Quotation number</label>
+        <input class="form-control mono" id="hf-quote-no" placeholder="e.g. Q-12345" oninput="onQuoteNoInput()">
+      </div>
+      <div class="form-group">
+        <label>Amount excluding VAT (R)</label>
+        <input class="form-control" id="hf-quote-amt" type="number" step="0.01" placeholder="0.00">
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:.85rem;font-weight:500">Add VAT to this amount</div>
+        <label class="switch"><input type="checkbox" id="hf-quote-vat"><span class="switch-slider"></span></label>
+      </div>
+      <p style="font-size:.74rem;color:var(--grey);line-height:1.5;margin-top:8px">
+        No hours, travel or materials are priced on a quoted job — the agreed amount is used as-is.
+      </p>
+    </div>
     <div class="form-group">
       <label>Job Type</label>
       <select class="form-control" id="hf-jobtype" onchange="onJobTypeChange(this.value)">
@@ -840,6 +867,14 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <div class="list-item-sub">John Thompson Field Services</div>
       </div>
       <div class="chip chip-grey" id="app-version-chip">v1.0</div>
+    </div>
+    <div class="list-item" onclick="checkForUpdates()">
+      <div class="icon-circle" style="background:var(--blue-light)">⟳</div>
+      <div class="list-item-main">
+        <div class="list-item-title">Check for updates</div>
+        <div class="list-item-sub">Fetch the latest published version</div>
+      </div>
+      <div style="color:var(--grey)">›</div>
     </div>
     <div style="height:env(safe-area-inset-bottom)"></div>
   </div>
@@ -1305,7 +1340,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAL2L+lw/kKr7jgEAAN8FAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.3.0';
+const APP_VERSION = '2.4.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -1714,6 +1749,11 @@ function newFso(fsoNumber, bookId) {
     nights: 0,
     spFolderUrl: '',
     lockedRates: null,
+    // 'CALLOUT' = normal job (hours, travel, materials all priced).
+    // 'QUOTE'   = work already quoted and accepted: no calculations, just the
+    //             agreed amount excluding VAT, and whether VAT gets added.
+    jobMode: null,
+    quote: { number: '', amountExVat: 0, addVat: true },
     header: {
       customer: '', customerId: '', addressSite: '', jobType: 'EXTERNAL', department: '',
       officialNo: '',
@@ -1770,8 +1810,22 @@ function createNewFso() {
 // ============================================================
 // TOTALS CALCULATION
 // ============================================================
+function isQuote(fso) { return fso && fso.jobMode === 'QUOTE'; }
+
 function calcTotals(fso) {
   const rates = fsoRates(fso);   // external/internal set resolved by job type
+
+  // Quote job: the price was agreed up front, so nothing is calculated from
+  // hours, travel or materials — only the quoted amount, and VAT if it applies.
+  if (isQuote(fso)) {
+    const q = fso.quote || {};
+    const sub = parseFloat(q.amountExVat) || 0;
+    const vat = q.addVat ? sub * ((rates.vatPercent === undefined ? 15 : rates.vatPercent) / 100) : 0;
+    return { totalNT: 0, totalOT15: 0, totalOT20: 0, totalKm: 0, totalMaterials: 0,
+             engTime: 0, ot15val: 0, ot20val: 0, kmVal: 0, accVal: 0, coVal: 0, nights: 0,
+             subtotal: sub, vatAmt: vat, total: sub + vat, rates, quoted: true };
+  }
+
   let totalNT = 0, totalOT15 = 0, totalOT20 = 0, totalKm = 0, totalMaterials = 0;
   for (const d of fso.days) {
     totalNT    += (parseFloat(d.ntHours) || 0);
@@ -2424,6 +2478,10 @@ function renderHeaderForm() {
   document.getElementById('hf-jobtype').value = (h.jobType === 'INTERNAL') ? 'INTERNAL' : 'EXTERNAL';
   document.getElementById('hf-dept-group').style.display = (h.jobType === 'INTERNAL') ? 'block' : 'none';
   document.getElementById('hf-date').value = h.date || '';
+  renderJobMode(fso);
+  document.getElementById('hf-quote-no').value = (fso.quote && fso.quote.number) || '';
+  document.getElementById('hf-quote-amt').value = (fso.quote && fso.quote.amountExVat) || '';
+  document.getElementById('hf-quote-vat').checked = !(fso.quote && fso.quote.addVat === false);
   document.getElementById('hf-official').value = h.officialNo || '';
   document.getElementById('hf-spfolder').value = fso.spFolderUrl || '';
   document.getElementById('hf-jtcontract').value = h.jtContractNo || '';
@@ -2434,6 +2492,51 @@ function renderHeaderForm() {
   document.getElementById('hf-desc').value = h.description || '';
   const cust = (APP.customers || []).find(c => c.id === h.customerId);
   fillBoilerSelect(cust, h.boilerNo || '');
+}
+
+// Call out vs Quote ------------------------------------------------------
+function renderJobMode(fso) {
+  const q = isQuote(fso);
+  const co = document.getElementById('hf-mode-callout');
+  const qb = document.getElementById('hf-mode-quote');
+  if (!co) return;
+  co.className = 'btn btn-sm ' + (q ? 'btn-secondary' : 'btn-primary');
+  qb.className = 'btn btn-sm ' + (q ? 'btn-primary' : 'btn-secondary');
+  co.style.flex = qb.style.flex = '1';
+  document.getElementById('hf-quote-card').style.display = q ? 'block' : 'none';
+  document.getElementById('hf-mode-note').textContent = q
+    ? 'Quoted work already accepted by the customer — enter the agreed amount below.'
+    : 'Normal job — hours, travel and materials are captured and priced.';
+}
+
+function setJobMode(mode) {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (mode === 'CALLOUT' && isQuote(fso)) {
+    if (!confirm('Switch back to a call-out job?\n\nThe quoted amount stays saved but is no longer used.')) return;
+  }
+  fso.jobMode = (mode === 'QUOTE') ? 'QUOTE' : 'CALLOUT';
+  addHistory(fso, 'Job basis set to ' + (fso.jobMode === 'QUOTE' ? 'Quote' : 'Call out'));
+  saveFsoData(fso);
+  renderJobMode(fso);
+  onQuoteNoInput();
+}
+
+// Keep the job description in step with the quotation number.
+function onQuoteNoInput() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso || !isQuote(fso)) return;
+  const el = document.getElementById('hf-quote-no');
+  const desc = document.getElementById('hf-desc');
+  if (!el || !desc) return;
+  const no = el.value.trim();
+  const line = no ? ('According to quotation ' + no) : 'According to quotation';
+  const cur = desc.value.trim();
+  if (/^according to quotation\b.*$/im.test(cur)) {
+    desc.value = cur.replace(/^according to quotation\b.*$/im, line);
+  } else {
+    desc.value = cur ? (line + '\n' + cur) : line;
+  }
 }
 
 function onJobTypeChange(val) {
@@ -2495,6 +2598,10 @@ function saveHeaderForm(silent) {
   fso.header.department         = fso.header.jobType === 'INTERNAL' ? document.getElementById('hf-department').value : '';
   fso.header.date               = document.getElementById('hf-date').value;
   fso.header.time               = document.getElementById('hf-time').value;
+  if (!fso.quote) fso.quote = { number: '', amountExVat: 0, addVat: true };
+  fso.quote.number      = document.getElementById('hf-quote-no').value.trim();
+  fso.quote.amountExVat = parseFloat(document.getElementById('hf-quote-amt').value) || 0;
+  fso.quote.addVat      = document.getElementById('hf-quote-vat').checked;
   fso.header.officialNo         = document.getElementById('hf-official').value.trim();
   fso.spFolderUrl               = document.getElementById('hf-spfolder').value.trim();
   fso.header.jtContractNo       = document.getElementById('hf-jtcontract').value.trim();
@@ -2990,6 +3097,18 @@ async function previewLocalFso() {
 
 // Pre-send checklist — catches the classic incomplete-FSO admin bounce-backs.
 function validateFsoForExport(fso) {
+  if (isQuote(fso)) {
+    const issues = [];
+    if (!fso.signatures.customer) issues.push('No customer signature');
+    if (!fso.signatures.engineer) issues.push('No engineer signature');
+    if (!(parseFloat(fso.quote && fso.quote.amountExVat) > 0)) issues.push('No quoted amount entered');
+    if (!(fso.quote && fso.quote.number)) issues.push('No quotation number entered');
+    return issues;
+  }
+  return validateCalloutForExport(fso);
+}
+
+function validateCalloutForExport(fso) {
   const issues = [];
   const t = calcTotals(fso);
   if (!fso.signatures.customer) issues.push('No CUSTOMER signature');
@@ -3174,8 +3293,15 @@ async function generateXLSXFilled(fso) {
   N('I64', rnd(t.totalOT20));N('M64', rnd(rt.ot20));   N('R64', rnd(t.ot20val));
   N('R65', rnd(t.totalMaterials));
   N('R68', rnd(t.accVal));
-  const sheetSub = t.engTime + t.kmVal + t.ot15val + t.ot20val + t.totalMaterials + t.accVal;
-  const sheetVat = (h.jobType === 'INTERNAL') ? 0 : sheetSub * ((rt.vatPercent === undefined ? 15 : rt.vatPercent) / 100);
+  if (isQuote(fso)) {
+    N('M61', 0); N('M62', 0); N('M63', 0); N('M64', 0);
+    N('R61', 0); N('R62', 0); N('R63', 0); N('R64', 0); N('R65', 0); N('R68', 0);
+    N('R69', t.subtotal || 0);
+  }
+  const sheetSub = isQuote(fso) ? (t.subtotal || 0)
+    : (t.engTime + t.kmVal + t.ot15val + t.ot20val + t.totalMaterials + t.accVal);
+  const sheetVat = isQuote(fso) ? (t.vatAmt || 0)
+    : ((h.jobType === 'INTERNAL') ? 0 : sheetSub * ((rt.vatPercent === undefined ? 15 : rt.vatPercent) / 100));
   N('R70', rnd(sheetSub)); N('I70', rnd(sheetVat)); N('R71', rnd(sheetVat)); N('R72', rnd(sheetSub + sheetVat));
 
   files['xl/worksheets/sheet1.xml'] = enc.encode(xml);
@@ -3479,6 +3605,8 @@ function migrateData() {
       if (f.nights === undefined) f.nights = f.accommodation ? 1 : 0;
       if (f.spFolderUrl === undefined) f.spFolderUrl = '';
       if (f.lockedRates === undefined) f.lockedRates = null;
+      if (f.jobMode === undefined) f.jobMode = 'CALLOUT';   // existing FSOs are call-outs
+      if (!f.quote) f.quote = { number: '', amountExVat: 0, addVat: true };
       if (f.header) {
         if (f.header.officialNo === undefined) f.header.officialNo = '';
         if (f.header.customerId === undefined) f.header.customerId = '';
@@ -4830,6 +4958,15 @@ function fsoSheetWrites(fso) {
   one('M63', rt.ot15 || 0);
   one('I64', t.totalOT20 || 0);
   one('M64', rt.ot20 || 0);
+
+  // Quoted job: nothing is priced from hours/travel/materials. The agreed
+  // amount goes in as "Other charges", and VAT is forced to nil when the
+  // engineer ticked the amount as already including it.
+  if (isQuote(fso)) {
+    one('M61', 0); one('M62', 0); one('M63', 0); one('M64', 0);
+    one('R69', t.subtotal || 0);
+    if (!t.vatAmt) one('I70', 0);
+  }
   return W;
 }
 
@@ -5120,10 +5257,13 @@ function odSetSheetMode(m) {
 // ============================================================
 // SERVICE WORKER REGISTRATION
 // ============================================================
+let swReg = null;
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').then(reg => {
-    // Tell the user when a new build has been installed, instead of silently
-    // serving it on some future load.
+  // updateViaCache:'none' is essential — without it the browser may serve sw.js
+  // from its own HTTP cache (GitHub Pages sends max-age), so a freshly pushed
+  // build can go unnoticed. This forces the update check to hit the network.
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    swReg = reg;
     reg.addEventListener('updatefound', () => {
       const nw = reg.installing;
       if (!nw) return;
@@ -5131,11 +5271,57 @@ if ('serviceWorker' in navigator) {
         if (nw.state === 'installed' && navigator.serviceWorker.controller) showUpdateBanner(reg);
       });
     });
+    // Check on load, whenever the app is brought back to the foreground, and
+    // every 15 minutes. An installed PWA is resumed rather than reloaded, so
+    // without this it can sit on an old build indefinitely.
+    const check = () => { try { reg.update(); } catch (e) {} };
+    check();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 15 * 60 * 1000);
   }).catch(e => console.warn('SW:', e));
   let _reloading = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (_reloading) return; _reloading = true; location.reload();
   });
+}
+
+// Manual "Check for updates" — asks GitHub directly what version is published,
+// so it gives a real answer even if the service worker is being stubborn.
+async function checkForUpdates(silent) {
+  if (!isOnline()) { toast('You are offline'); return; }
+  if (!silent) toast('Checking for updates…');
+  try {
+    if (swReg) { try { await swReg.update(); } catch (e) {} }
+    const res = await fetch('FSO_App.html?_=' + Date.now(), { cache: 'no-store' });
+    const txt = await res.text();
+    const m = /const APP_VERSION = '([^']+)'/.exec(txt);
+    const live = m ? m[1] : null;
+    if (!live) { if (!silent) toast('Could not read the published version'); return; }
+    if (live === APP_VERSION) {
+      if (!silent) toast('Up to date — v' + APP_VERSION);
+      return;
+    }
+    if (confirm('A new version is available.\n\nInstalled: v' + APP_VERSION +
+                '\nAvailable: v' + live + '\n\nUpdate now? Your jobs are not affected.')) {
+      await applyUpdateNow();
+    }
+  } catch (e) {
+    console.warn('update check', e);
+    if (!silent) toast('Update check failed: ' + (e.message || e));
+  }
+}
+
+// Force the new build in: drop the caches, retire the old worker, reload.
+async function applyUpdateNow() {
+  toast('Updating…');
+  try {
+    if (swReg && swReg.waiting) swReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    if (window.caches && caches.keys) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+  } catch (e) { console.warn('cache clear', e); }
+  setTimeout(() => location.reload(), 400);
 }
 function showUpdateBanner(reg) {
   if (document.getElementById('update-banner')) return;

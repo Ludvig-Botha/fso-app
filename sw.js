@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fso-cache-v15';
+const CACHE_NAME = 'fso-cache-v16';
 // Local shell assets — install fails if these can't be cached (correct: the app
 // can't work without them).
 const CORE_ASSETS = [
@@ -17,7 +17,12 @@ const CDN_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
-      cache.addAll(CORE_ASSETS).then(() =>
+      // 'reload' bypasses the browser HTTP cache — without it the install can
+      // store a stale FSO_App.html straight back into the new cache.
+      Promise.all(CORE_ASSETS.map(u =>
+        fetch(new Request(u, { cache: 'reload' }))
+          .then(r => (r && r.ok) ? cache.put(u, r) : null)
+      )).then(() =>
         Promise.all(CDN_ASSETS.map(u => cache.add(u).catch(e => console.warn('SW cdn cache skip:', u))))
       )
     )
@@ -57,7 +62,7 @@ self.addEventListener('fetch', event => {
   // NETWORK-FIRST for the app shell so the latest build always loads when online.
   if (isAppShell(req)) {
     event.respondWith(
-      fetch(req).then(response => {
+      fetch(new Request(req.url, { cache: 'no-store', credentials: 'same-origin' })).then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(req, clone));

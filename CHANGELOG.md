@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.4.0 — 2026-07-26
+- Auto-update fixed. Three separate causes: (1) the service worker was
+  registered without updateViaCache:'none', so the browser could serve sw.js
+  from its own HTTP cache and never notice a new build; (2) the worker fetched
+  the app shell through that same HTTP cache, so even a "network-first" load
+  could return a stale FSO_App.html; (3) an installed PWA is resumed rather
+  than reloaded, so no update check ever ran. Now: registration bypasses the
+  HTTP cache, shell fetches use no-store, and updates are checked on load, on
+  return to the foreground, and every 15 minutes.
+- New "Check for updates" in Settings → About: asks GitHub what version is
+  published, compares it with the running build, and offers a forced update
+  (clears caches, retires the old worker, reloads).
+- PIN keypad buttons are now round.
+- NEW: Call out vs Quote basis per FSO (Job basis on the FSO Details screen).
+  - Call out behaves exactly as before.
+  - Quote skips all pricing of hours, travel and materials: enter the
+    quotation number and the amount excluding VAT, and tick whether VAT should
+    be added. The quoted amount is written to the sheet as Other charges, and
+    VAT is forced to nil when the tick box is off.
+  - The job description automatically carries "According to quotation <number>"
+    as its first line, and follows the number if it changes.
+  - Export validation for quoted jobs checks the quotation number, the amount
+    and both signatures instead of day entries and hours.
+- Existing FSOs are treated as call-outs. SW cache v16.
+
 ## v2.3.0 — 2026-07-25
 - ROOT CAUSE FOUND (Graph 501 unsupportedWorkbook): the embedded FSO template
   still contained an EXTERNAL LINK back to "47700C-47750C Ludvig Botha FSO
