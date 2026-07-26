@@ -8,8 +8,19 @@ window.bugLog = [];
 window.logAction = function(msg, type) {
   try {
     window.bugLog.push({ ts: new Date().toISOString(), type: type || 'action', msg: String(msg) });
-    if (window.bugLog.length > 100) window.bugLog.shift();
+    if (window.bugLog.length > 200) window.bugLog.shift();
+    try { localStorage.setItem('fso_buglog', JSON.stringify(window.bugLog)); } catch (e) {}
   } catch (e) {}
+};
+// Keep the log across reloads — an error that forces a restart is exactly the
+// one worth reading afterwards.
+try {
+  var _saved = localStorage.getItem('fso_buglog');
+  if (_saved) window.bugLog = JSON.parse(_saved) || [];
+} catch (e) {}
+window.logError = function(where, err) {
+  var m = (err && (err.message || err)) || 'unknown';
+  window.logAction(where + ' — ' + String(m), 'error');
 };
 window.onerror = function(msg, src, line, col, err) {
   var where = (src || '').split('/').pop() + ':' + line;
@@ -694,18 +705,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openSpRegister()">Register job on SharePoint ↗</button>
-        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openSpFolder()">Job folder ↗</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openSpFolder()">SharePoint folder ↗</button>
       </div>
-    </div>
-    <div class="card">
-      <div class="card-title" style="margin-bottom:10px">Also produce</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button id="fmt-pdf" class="btn btn-primary btn-sm" style="flex:1" onclick="setExportFmt('pdf')">PDF copy</button>
-        <button id="fmt-xlsx" class="btn btn-secondary btn-sm" style="flex:1" onclick="setExportFmt('xlsx')">Workbook only</button>
-      </div>
-      <p style="font-size:.78rem;color:var(--grey);line-height:1.45">
-        PDF copy: the filled FSO sheet is converted to a signed PDF, saved next to the workbook in OneDrive and downloaded here.
-      </p>
     </div>
     <div class="card">
       <div class="card-title" style="margin-bottom:10px">Email copy to</div>
@@ -726,10 +727,12 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <div style="height:8px"></div>
   </div>
   <div class="bottombar">
-    <div style="display:flex;gap:10px">
-      <button class="btn btn-secondary" onclick="openFsoSheetOnline()" style="flex:0 0 40%">Preview Sheet</button>
-      <button class="btn btn-primary" onclick="doExport()" style="flex:1">Send to Workbook</button>
+    <button class="btn btn-secondary" style="margin-bottom:8px" onclick="openFsoSheetOnline()">Preview sheet</button>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-secondary" style="flex:1;margin:0" onclick="sendCustomerEmail()">Send customer email</button>
+      <button class="btn btn-secondary" style="flex:1;margin:0" onclick="sendAdminEmails()">Send admin emails</button>
     </div>
+    <button class="btn btn-primary" onclick="closeJob()">Close job</button>
   </div>
 </div>
 
@@ -1356,7 +1359,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIADib+lw/kKr7jgEAAN8FAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.5.0';
+const APP_VERSION = '2.6.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -1782,6 +1785,8 @@ function newFso(fsoNumber, bookId) {
     nights: 0,
     spFolderUrl: '',
     lockedRates: null,
+    docsBuiltAt: 0,
+    jobFolderUrl: '',
     // 'CALLOUT' = normal job (hours, travel, materials all priced).
     // 'QUOTE'   = work already quoted and accepted: no calculations, just the
     //             agreed amount excluding VAT, and whether VAT gets added.
@@ -2244,13 +2249,13 @@ function renderFsoEdit() {
 
   // External systems + preview
   html += '<div class="card">';
-  html += '<div class="card-title" style="margin-bottom:10px">Job Documents & Company System</div>';
-  html += '<button class="btn btn-secondary" style="margin-bottom:8px" onclick="previewFsoPdf()">Preview FSO (PDF)</button>';
-  html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
-  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openSpFolder()">Open Job Folder ↗</button>';
-  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openWorkbookFolder()">Workbook Folder ↗</button>';
+  html += '<div class="card-title" style="margin-bottom:10px">Job Documents</div>';
+  html += syncStateBadge(fso);
+  html += '<button class="btn btn-primary" style="margin-bottom:8px" onclick="createOrUpdateJob()">Create / Update job</button>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openSpFolder()">SharePoint folder ↗</button>';
+  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openJobOneDriveFolder()">OneDrive folder ↗</button>';
   html += '</div>';
-  html += '<button class="btn btn-secondary" onclick="sendToCompanySystem()">Create on Company System ✉</button>';
   html += '</div>';
 
   // (Revision history is now opened via the 🕘 History button in the status row.)
@@ -3103,6 +3108,18 @@ async function openFsoSheetOnline() {
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
   const book = APP.books[fso.bookId];
+  // Prefer this job's own workbook in its OneDrive job folder.
+  if (odIsConnected() && isOnline()) {
+    try {
+      const folderId = await odFsoJobFolder(fso);
+      const want = fsoDocTitle(fso) + ' FSO.xlsx';
+      const kids = await gFetch('GET', '/me/drive/items/' + folderId + '/children?$select=name,webUrl&$top=200');
+      const hit = (kids.value || []).find(k => k.name === want);
+      if (hit && hit.webUrl) { window.open(hit.webUrl, '_blank'); return; }
+      toast('No job workbook yet — tap Create / Update job first');
+      return;
+    } catch (e) { logError('openFsoSheetOnline', e); }
+  }
   if (book.config.webUrl && isOnline()) {
     window.open(book.config.webUrl, '_blank');
     toast('Opening workbook — sheet ' + sheetNameFor(fso.fsoNumber));
@@ -3223,7 +3240,7 @@ async function doExport() {
     if (emails.length) {
       try {
         toast('Emailing ' + emails.length + ' recipient(s)…');
-        await odEmailFso(fso, emails, pdfBytes);
+        await odEmailFso(fso, emails, pdfBytes, [], 'customer');
         addHistory(fso, 'Emailed to: ' + emails.join(', '));
         emailTags = [];
       } catch (e) { console.error(e); toast('Email failed (workbook sent OK): ' + (e.message || e)); }
@@ -3402,6 +3419,136 @@ async function previewFsoPdf() {
   }
 }
 
+// ---- Sync state badge ---------------------------------------------------
+// Shows at a glance whether what is on screen matches what is in OneDrive.
+function syncStateBadge(fso) {
+  const built = fso.docsBuiltAt || 0;
+  const changed = fso.modifiedAt || 0;
+  let colour, text;
+  if (!built) { colour = 'grey'; text = 'Not created in OneDrive yet'; }
+  else if (changed > built) { colour = 'orange'; text = 'Changed since last update — needs updating'; }
+  else { colour = 'green'; text = 'Up to date with OneDrive'; }
+  return '<div style="padding:8px 10px;border-radius:10px;margin-bottom:10px;font-size:.8rem;' +
+    'background:var(--' + colour + '-light);color:var(--' + colour + ')">' +
+    (colour === 'green' ? '✓ ' : colour === 'orange' ? '● ' : '○ ') + esc(text) +
+    (built ? ' · last built ' + esc(fmtHistTs(new Date(built).toISOString())) : '') + '</div>';
+}
+
+// ---- Create / Update job ------------------------------------------------
+// One action: make (or refresh) the job folder in OneDrive, write the job's
+// own workbook, produce the PDF, and show it. No email is sent here.
+async function createOrUpdateJob() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (!(fso.header.officialNo || '').trim()) {
+    alert('No official FSO number yet.\n\nRegister the job on SharePoint first, then paste the number into FSO Details.');
+    return;
+  }
+  if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
+  toast('Building job documents…');
+  try {
+    lockRatesForExport(fso);
+    const pdf = await odMakeFsoPdf(fso);
+    fso.docsBuiltAt = Date.now();
+    addHistory(fso, 'Job documents created/updated: ' + pdf.name);
+    saveFsoData(fso);
+    syncBook(fso.bookId).catch(e => logError('syncBook', e));
+    // Show the PDF straight away.
+    const blob = new Blob([pdf.bytes], { type: 'application/pdf' });
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(blob);
+    document.getElementById('preview-frame').src = previewUrl;
+    document.getElementById('preview-overlay').classList.add('show');
+    toast('Job updated in OneDrive');
+    renderFsoEdit();
+  } catch (e) {
+    console.error(e);
+    logError('createOrUpdateJob', e);
+    toast('Job update failed: ' + (e.message || e));
+  }
+}
+
+// Open this job's own folder in OneDrive (the one holding its xlsx + PDFs).
+async function openJobOneDriveFolder() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (fso.jobFolderUrl) { window.open(fso.jobFolderUrl, '_blank'); return; }
+  if (!odIsConnected() || !isOnline()) { toast('Create the job first, or connect to OneDrive'); return; }
+  try {
+    toast('Finding job folder…');
+    const id = await odFsoJobFolder(fso);
+    const meta = await gFetch('GET', '/me/drive/items/' + id + '?$select=webUrl');
+    if (meta && meta.webUrl) {
+      fso.jobFolderUrl = meta.webUrl; saveFsoData(fso);
+      window.open(meta.webUrl, '_blank');
+    } else toast('Could not resolve the folder link');
+  } catch (e) { logError('openJobOneDriveFolder', e); toast('Could not open folder: ' + (e.message || e)); }
+}
+
+// ---- Export screen actions ---------------------------------------------
+async function sendCustomerEmail() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const inp = document.getElementById('email-input');
+  if (inp) { const v = inp.value.trim().replace(/,$/, ''); if (v && v.includes('@')) { emailTags.push(v); inp.value = ''; renderEmailTags(); } }
+  if (!emailTags.length) { toast('Add at least one address in "Email copy to"'); return; }
+  await sendFsoEmail(fso, emailTags.slice(), [], 'customer');
+}
+
+async function sendAdminEmails() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const sp = spCfg();
+  if (!sp.adminEmail) {
+    alert('No admin email set.\n\nAdd it under Settings → SharePoint & OneDrive → Company system emails.');
+    goTo('screen-settings-sharepoint'); return;
+  }
+  const cc = [];
+  if (sp.managerEmail) sp.managerEmail.split(/[;,]/).forEach(a => { a = a.trim(); if (a) cc.push(a); });
+  const mine = (APP.settings.engineerEmail || '').trim();
+  if (mine && cc.indexOf(mine) < 0) cc.push(mine);
+  await sendFsoEmail(fso, [sp.adminEmail], cc, 'admin');
+}
+
+// Shared sender: builds (or rebuilds) the PDF, attaches it plus any ticked
+// attachments, and sends from the engineer's own mailbox.
+async function sendFsoEmail(fso, to, cc, kind) {
+  if (!(fso.header.officialNo || '').trim()) { alert('Enter the official FSO number first.'); return; }
+  if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
+  if (!confirm('Send to ' + to.join(', ') + (cc.length ? '\ncc ' + cc.join(', ') : '') + '?')) return;
+  try {
+    lockRatesForExport(fso);
+    toast('Building PDF…');
+    const pdf = await odMakeFsoPdf(fso);
+    fso.docsBuiltAt = Date.now();
+    toast('Sending…');
+    await odEmailFso(fso, to, pdf.bytes, cc, kind);
+    addHistory(fso, (kind === 'admin' ? 'Admin' : 'Customer') + ' email sent to ' + to.join(', ') +
+      (cc.length ? ' cc ' + cc.join(', ') : ''));
+    saveFsoData(fso); syncBook(fso.bookId).catch(e => logError('syncBook', e));
+    toast('Email sent');
+  } catch (e) {
+    console.error(e);
+    logError('sendFsoEmail/' + kind, e);
+    toast('Email failed: ' + (e.message || e));
+  }
+}
+
+async function closeJob() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const issues = validateFsoForExport(fso);
+  if (issues.length && !confirm('This job still has:\n\n• ' + issues.join('\n• ') + '\n\nClose it anyway?')) return;
+  if (!confirm('Mark this FSO as complete?')) return;
+  fso.status = 'complete';
+  fso.closedDate = todayStr();
+  addHistory(fso, 'Job closed (complete)');
+  saveFsoData(fso);
+  syncBook(fso.bookId).catch(e => logError('syncBook', e));
+  toast('Job closed');
+  goBack();
+}
+
 // ---- "Create on Company System" — one email, signed PDF attached -------
 // To: admin (main). CC: service manager. From: the signed-in engineer
 // (Graph /me/sendMail always sends as the signed-in account).
@@ -3447,6 +3594,12 @@ async function sendToCompanySystem() {
               contentBytes: u8ToB64(xb) };
     }
     const h = fso.header;
+    // CC: service manager + the engineer's own address, so there is always a
+    // copy in the engineer's mailbox and nothing depends on one field alone.
+    const ccList = [];
+    if (sp.managerEmail) sp.managerEmail.split(/[;,]/).forEach(a => { a = a.trim(); if (a) ccList.push(a); });
+    const mine = (APP.settings.engineerEmail || '').trim();
+    if (mine && ccList.indexOf(mine) < 0) ccList.push(mine);
     const subject = jobNo + ', ' + (h.customer || '') + ', ' + (h.description || '') + ', FSO';
     const body = 'Good day ' + (sp.adminName || 'Loriza') + '.\n\nPlease find attached signed FSO for processing.\n\nThank you\n' +
       (APP.books[fso.bookId].config.engineerName || '') + '\nJohn Thompson (ACTOM Pty Ltd)';
@@ -3456,12 +3609,13 @@ async function sendToCompanySystem() {
         subject: subject,
         body: { contentType: 'Text', content: body },
         toRecipients: [{ emailAddress: { address: sp.adminEmail } }],
-        ccRecipients: sp.managerEmail ? [{ emailAddress: { address: sp.managerEmail } }] : [],
+        ccRecipients: ccList.map(a => ({ emailAddress: { address: a } })),
         attachments: [att]
       }, saveToSentItems: true } });
-    addHistory(fso, 'Sent to company system: ' + sp.adminEmail + (sp.managerEmail ? ' cc ' + sp.managerEmail : ''));
+    addHistory(fso, 'Sent to company system: to ' + sp.adminEmail + (ccList.length ? ' · cc ' + ccList.join(', ') : ' · no CC set'));
+    logAction('company-system email sent to ' + sp.adminEmail + ' cc [' + ccList.join(', ') + ']');
     saveFsoData(fso); syncBook(fso.bookId);
-    toast('Sent to ' + sp.adminEmail);
+    toast(ccList.length ? ('Sent to ' + sp.adminEmail + ', cc ' + ccList.length) : ('Sent to ' + sp.adminEmail + ' (no CC set)'));
   } catch (e) {
     console.error(e);
     toast('Company-system email failed: ' + (e.message || e));
@@ -3641,6 +3795,8 @@ function migrateData() {
       if (f.nights === undefined) f.nights = f.accommodation ? 1 : 0;
       if (f.spFolderUrl === undefined) f.spFolderUrl = '';
       if (f.lockedRates === undefined) f.lockedRates = null;
+      if (f.docsBuiltAt === undefined) f.docsBuiltAt = 0;
+      if (f.jobFolderUrl === undefined) f.jobFolderUrl = '';
       if (f.jobMode === undefined) f.jobMode = 'CALLOUT';   // existing FSOs are call-outs
       if (!f.quote) f.quote = { number: '', amountExVat: 0, addVat: true };
       if (f.header) {
@@ -4746,11 +4902,12 @@ function u8ToB64(bytes) {
 }
 
 // ---- Email the FSO copy + ticked attachments via Graph -----------------
-async function odEmailFso(fso, recipients, pdfBytes) {
+async function odEmailFso(fso, recipients, pdfBytes, ccList, kind) {
+  ccList = ccList || [];
   const atts = [];
-  const docBase = fsoDocBaseName(fso);
+  const docBase = fsoDocTitle(fso);
   if (pdfBytes) {
-    atts.push({ '@odata.type': '#microsoft.graph.fileAttachment', name: docBase + '.pdf',
+    atts.push({ '@odata.type': '#microsoft.graph.fileAttachment', name: docBase + ' FSO.pdf',
       contentType: 'application/pdf', contentBytes: u8ToB64(pdfBytes) });
   } else {
     const xlsxBytes = await generateXLSXFilled(fso);
@@ -4771,16 +4928,26 @@ async function odEmailFso(fso, recipients, pdfBytes) {
       contentType: a.mimeType || 'application/octet-stream', contentBytes: b64 });
   }
   const h = fso.header;
-  const body = 'Good day,\n\nPlease find attached Field Service Order ' + fso.fsoNumber +
-    (h.customer ? ' for ' + h.customer : '') + (h.date ? ', dated ' + h.date : '') + '.' +
-    '\n\nRegards\n' + (APP.books[fso.bookId].config.engineerName || '') + '\nJohn Thompson (ACTOM Pty Ltd)';
+  const eng = (APP.books[fso.bookId].config.engineerName || '');
+  const sp = spCfg();
+  // Admin mail uses the wording the office expects; customer mail is neutral.
+  const body = (kind === 'admin')
+    ? ('Good day ' + (sp.adminName || 'Loriza') + '.\n\nPlease find attached signed FSO for processing.\n\nThank you\n' +
+       eng + '\nJohn Thompson (ACTOM Pty Ltd)')
+    : ('Good day,\n\nPlease find attached Field Service Order ' + (h.officialNo || fso.fsoNumber) +
+       (h.customer ? ' for ' + h.customer : '') + (h.date ? ', dated ' + fmtDateDMY(h.date) : '') + '.' +
+       '\n\nRegards\n' + eng + '\nJohn Thompson (ACTOM Pty Ltd)');
+  const subject = (h.officialNo || fso.fsoNumber) + ', ' + (h.customer || '') +
+                  ', ' + (h.description || '').split(/\r?\n/)[0] + ', FSO';
   await gFetch('POST', '/me/sendMail', { json: {
     message: {
-      subject: 'FSO ' + fsoDocBaseName(fso) + (h.customer ? ' — ' + h.customer : ''),
+      subject: subject,
       body: { contentType: 'Text', content: body },
       toRecipients: recipients.map(e => ({ emailAddress: { address: e } })),
+      ccRecipients: ccList.map(e => ({ emailAddress: { address: e } })),
       attachments: atts
     }, saveToSentItems: true } });
+  logAction('email sent (' + (kind || 'copy') + ') to [' + recipients.join(', ') + '] cc [' + ccList.join(', ') + ']');
   if (skipped.length) toast('Emailed — too large to attach: ' + skipped.join(', '));
 }
 
@@ -4974,14 +5141,29 @@ async function odEnsureSheet(itemId, name, book, fsoNumber) {
   }
   const tmpl = sheets.find(w => w.name === 'TEMPLATE') || sheets.find(w => w.name !== 'All') || sheets[0];
   const before = sheets.map(w => w.name);
-  // NOTE: the copy action only resolves on the /worksheets/{name}/copy form.
-  // The parenthesised worksheets('name') form returns
-  // 400 "Resource not found for the segment 'copy'".
-  await gFetchWb('POST', wbBase + '/worksheets/' + encodeURIComponent(tmpl.name) + '/copy',
-    { json: { name: name, positionType: 'End' } });
+  // The copy action is fussy about how the worksheet is addressed. Try the
+  // worksheet ID first (most reliable), then the name. If the tenant does not
+  // expose the copy action at all, fall back to adding a blank sheet so the
+  // export still completes instead of failing outright.
+  let copied = false;
+  const attempts = [
+    wbBase + '/worksheets/' + encodeURIComponent(tmpl.id) + '/copy',
+    wbBase + '/worksheets/' + encodeURIComponent(tmpl.name) + '/copy'
+  ];
+  for (const url of attempts) {
+    try {
+      await gFetchWb('POST', url, { json: { name: name, positionType: 'End' } });
+      copied = true; break;
+    } catch (e) { logError('worksheet copy', e); }
+  }
+  if (!copied) {
+    await gFetchWb('POST', wbBase + '/worksheets/add', { json: { name: name } });
+    toast('Sheet added without template formatting (copy unavailable)');
+    logAction('worksheet copy unavailable — added blank sheet ' + name, 'error');
+  }
   const after = await gFetchWb('GET', wbBase + '/worksheets');
   const fresh = (after.value || []).find(w => before.indexOf(w.name) < 0);
-  if (fresh) {
+  if (fresh && fresh.name !== name) {
     await gFetchWb('PATCH', wsAddr(fresh.name), { json: { name: name, visibility: 'Visible' } });
   }
   // Once at least one real sheet exists, hide the TEMPLATE source.
@@ -5252,7 +5434,7 @@ async function odDrainQueue() {
             catch (e) { console.warn('queued pdf', e); }
           }
           if (op.emails && op.emails.length) {
-            try { await odEmailFso(fso, op.emails, pdfBytes); addHistory(fso, 'Emailed to: ' + op.emails.join(', ')); }
+            try { await odEmailFso(fso, op.emails, pdfBytes, [], 'customer'); addHistory(fso, 'Emailed to: ' + op.emails.join(', ')); }
             catch (e) { console.warn('queued email', e); }
           }
           saveFsoData(fso);

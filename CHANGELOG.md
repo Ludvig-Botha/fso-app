@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.6.0 — 2026-07-26
+- Bug log now survives a reload and records Graph failures automatically
+  (Settings > Report a Bug), so an error can be read after the fact.
+- Worksheet copy (400 "segment 'copy'"): now tries the worksheet ID first, then
+  the name, and if the tenant does not expose the copy action at all it adds a
+  plain sheet and says so, rather than failing the whole export.
+- Admin email now CCs the service manager AND the engineer. Multiple manager
+  addresses can be separated by commas. The toast and job history record
+  exactly who it went to.
+- FSO screen reworked: "Create / Update job" replaces the old preview and
+  company-system buttons. It creates/refreshes the OneDrive job folder, writes
+  the job workbook, produces the PDF and opens it. A badge above it shows
+  whether the app data matches OneDrive (up to date / changed since last
+  update / not created yet).
+- Folder buttons renamed: "SharePoint folder" and "OneDrive folder"; the
+  OneDrive one resolves this job's own folder link automatically.
+- Export screen: "Also produce" removed; "Send to Workbook" removed. Bottom bar
+  is now Preview sheet / Send customer email / Send admin emails / Close job.
+- Preview sheet opens the job's own workbook in its OneDrive folder.
+- Email subject is now "<job no>, <company>, <description>, FSO" for both
+  customer and admin mail; admin mail keeps the Loriza wording.
+
+### Known, not yet done
+- Attachments are emailed as separate files; they are not yet merged into the
+  FSO PDF itself.
+- Logo positioning and the sheet layout still need work — next step is
+  rebuilding the template from scratch, step by step.
+- Service engineer name is missing from the rendered sheet (cell X19 is not
+  being written).
+
 ## v2.5.0 — 2026-07-26
 - FIX (423 resourceLocked / no PDFs): FSO PDFs are built from a locally
   generated workbook again, then uploaded and converted. The server-side
