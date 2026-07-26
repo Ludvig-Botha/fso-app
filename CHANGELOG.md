@@ -1,5 +1,94 @@
 # Changelog
 
+## v2.8.2 — 2026-07-26
+- Your latest template embedded, with the logos moved to the new ranges and
+  filling them completely:
+  - ACTOM logo fills B2:AP9  -> renders 533.9 x 75.6 pt, inset from the page
+    edge as intended
+  - John Thompson logo fills C11:N14 -> renders 155.4 x 37.8 pt
+  - Customer signature fills AE60:AM62, engineer signature fills AE67:AM69
+    (both 116.5 x 28.3 pt)
+- Template re-validated: 22 formulas intact, no error cells, and the full cell
+  map renders correctly.
+
+### Aspect ratio, for information
+Filling stretches each logo horizontally by a small amount:
+  ACTOM          range 7.61:1 vs artwork 6.34:1  -> 1.20x wider
+  John Thompson  range 4.42:1 vs artwork 3.43:1  -> 1.29x wider
+Both are far better than the previous allocation (which stretched the John
+Thompson logo 1.83x). If you want them geometrically perfect, add one more row
+to each range: B2:AP10 gives ACTOM 6.76:1 and C11:N15 gives John Thompson
+3.54:1, which is near-exact for both.
+
+## v2.8.1 — 2026-07-26
+- Images now FILL their allocated ranges completely (two-cell anchors with zero
+  offsets), rather than being fitted inside them:
+  - ACTOM logo spans A1:AQ10 in full
+  - John Thompson logo spans A11:Q14 in full
+  - Customer signature fills AE60:AM62, engineer signature fills AE67:AM69
+- Measured in the rendered PDF: ACTOM 559.8 x 94.5 pt (full text width),
+  John Thompson 220.1 x 37.8 pt, both signature boxes 116.5 x 28.3 pt.
+
+### Note on the John Thompson logo
+Filling A11:Q14 stretches it horizontally by about 1.8x (the artwork is 3.4:1,
+the range is 6.3:1), so it will look wide. The ACTOM logo is unaffected — its
+artwork is 6.34:1 against a 6.38:1 range, so filling is a near-perfect match.
+If the stretch looks wrong on the real render, either narrow the range to about
+A11:I14, or say the word and I will switch that one image back to fitting
+inside the range with its proportions kept.
+
+## v2.8.0 — 2026-07-26
+- Your updated template is now embedded, with the images placed into the exact
+  ranges you allocated:
+  - ACTOM logo fitted inside A1:AQ10 (1132x178 px, aspect ratio preserved)
+  - John Thompson logo fitted inside A11:Q14 (244x71 px)
+  - Customer signature fills AE60:AM62, engineer signature fills AE67:AM69
+  A drawing part was created from scratch (the file had none) and blank
+  transparent placeholders sit in the signature boxes, so an unsigned FSO shows
+  nothing rather than a stray mark.
+- IMPORTANT FIX — formulas are no longer destroyed on export. The cell writer
+  used to replace whole cells, wiping the formulas you added. It now keeps the
+  formula and refreshes only its cached value, so:
+  - the PDF converter renders the correct number (it does not recalculate), and
+  - the workbook stays live and recalculates when opened in Excel.
+- Verified against your cell map with a full worked example: 12 h NT at R660 =
+  R7 920, 92 km at R8.50 = R782, 2 h at R890 = R1 780, materials R1 450,
+  accommodation 1 night at R1 800, subtotal R13 732, VAT R2 059.80, total
+  R15 791.80. Every field landed in its allocated cell. See
+  Template_Verification.pdf.
+
+## v2.7.0 — 2026-07-26
+- FIX (crash on Export): removing the PDF/workbook toggle left setExportFmt
+  still styling buttons that no longer existed, so opening the Export screen
+  threw "Cannot set properties of null". The call is gone and the function is
+  now DOM-safe for the queued-export path that still references it.
+- NEW TEMPLATE: "New FSO template 26072026" is now the app's template, cleaned
+  and wired up:
+  - the two logos were "image in cell" rich values (rendering #VALUE! at A1/A11
+    and unreadable to Graph). They are now normal anchored pictures — ACTOM at
+    A1, John Thompson at A11.
+  - a drawing part was created from scratch (the file had none) with blank
+    transparent signature placeholders anchored at AE60 (customer) and AE67
+    (engineer), so signatures land in the right boxes and an unsigned FSO shows
+    nothing.
+  - richData, metadata, person, calcChain and label parts removed; cached
+    formula results stripped.
+- Cell map aligned to the confirmed layout. Notably fixed:
+  - Service Engineer name now written to X19 AND AE70. It was previously
+    invisible because the old sheet pulled AE70 from a formula that never
+    recalculated during PDF conversion.
+  - Job overview block starts at A42 (was A43).
+  - Address prints street (F16), city (F17), country (F18).
+  - Signature image order corrected: image3 = customer, image4 = engineer.
+- Verified by filling every mapped cell and rendering to PDF; all 30+ fields
+  land in the correct boxes and the totals row, materials total and VAT compute
+  correctly. Test render included as Template_Cellmap_Test.pdf.
+
+### Note for you to check in Excel
+- I70 (the VAT cell that feeds "SUB TOTAL") is formatted as dollars in the new
+  template, so it shows $217.50 instead of R 217.50. Worth changing the cell
+  format to Rand in the template and re-sending it.
+
 ## v2.6.0 — 2026-07-26
 - Bug log now survives a reload and records Graph failures automatically
   (Settings > Report a Bug), so an error can be read after the fact.
