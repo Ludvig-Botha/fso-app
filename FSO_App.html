@@ -576,7 +576,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </p>
       <div class="form-group">
         <label>Official FSO No.</label>
-        <input class="form-control mono" id="hf-official" placeholder="Number from SharePoint registration">
+        <input class="form-control mono" id="hf-official" placeholder="Number from SharePoint registration" oninput="updateFolderPreview()">
       </div>
       <div class="form-group" style="margin-bottom:8px">
         <label>SharePoint job folder link</label>
@@ -611,7 +611,22 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     </div>
     <div class="form-group">
       <label>For Customer's Attention / Description</label>
-      <textarea class="form-control" id="hf-desc" rows="3" placeholder="Job description and customer instructions…"></textarea>
+      <textarea class="form-control" id="hf-desc" rows="3" placeholder="Job description and customer instructions…" oninput="updateFolderPreview()"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Folder description <span style="font-weight:400;color:var(--grey)">— short name for the OneDrive folder and files</span></label>
+      <input class="form-control" id="hf-folderdesc" maxlength="60" placeholder="e.g. Boiler 3 overhaul"
+             oninput="updateFolderPreview()">
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px">
+        <div style="font-size:.72rem;color:var(--grey)">Leave empty to use the job description above.</div>
+        <div style="font-size:.72rem;color:var(--grey)" id="hf-folderdesc-count">0/60</div>
+      </div>
+      <div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--grey-light);
+                  font-size:.74rem;color:#374151;word-break:break-word">
+        <span style="color:var(--grey)">OneDrive folder name:</span><br>
+        <span class="mono" id="hf-folder-preview">—</span>
+        <div style="color:var(--grey);margin-top:4px" id="hf-folder-preview-note"></div>
+      </div>
     </div>
     <div style="height:8px"></div>
   </div>
@@ -1369,7 +1384,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.9.3';
+const APP_VERSION = '2.9.4';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2543,8 +2558,33 @@ function renderHeaderForm() {
   document.getElementById('hf-vatnr').value = h.customerVATNo || '';
   document.getElementById('hf-accnr').value = h.accountNo || '';
   document.getElementById('hf-desc').value = h.description || '';
+  document.getElementById('hf-folderdesc').value = h.folderDesc || '';
+  updateFolderPreview();
   const cust = (APP.customers || []).find(c => c.id === h.customerId);
   fillBoilerSelect(cust, h.boilerNo || '');
+}
+
+// Live preview of the folder / file name, built with the same function the
+// export uses, so what is shown here is exactly what OneDrive will get.
+function updateFolderPreview() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const fd = document.getElementById('hf-folderdesc');
+  const pv = document.getElementById('hf-folder-preview');
+  const ct = document.getElementById('hf-folderdesc-count');
+  if (!fd || !pv) return;
+  if (ct) ct.textContent = fd.value.length + '/60';
+  const custId = document.getElementById('hf-customer-select').value;
+  const cust = (APP.customers || []).find(c => c.id === custId);
+  const numberText = (document.getElementById('hf-official').value || '').trim() ||
+                     (fso ? fso.fsoNumber : '');
+  const desc = fd.value.trim() || document.getElementById('hf-desc').value.trim();
+  const title = fsoDocTitleFrom(numberText, cust ? cust.name : (fso && fso.header.customer), desc) ||
+                (fso ? fso.fsoNumber : '');
+  pv.textContent = title || '—';
+  const note = document.getElementById('hf-folder-preview-note');
+  if (note) note.textContent = title
+    ? title.length + '/110 characters · the workbook and PDF inside are the same name + " FSO.xlsx" / " FSO.pdf"'
+    : '';
 }
 
 // Call out vs Quote ------------------------------------------------------
@@ -2630,7 +2670,7 @@ function showRateSetHint(fso) {
 
 function onCustomerPick(custId) {
   const c = (APP.customers || []).find(x => x.id === custId);
-  if (!c) { fillBoilerSelect(null, ''); return; }
+  if (!c) { fillBoilerSelect(null, ''); updateFolderPreview(); return; }
   document.getElementById('hf-site').value = c.address || '';
   document.getElementById('hf-vatnr').value = c.vatNo || '';
   document.getElementById('hf-accnr').value = c.accountNo || '';
@@ -2640,6 +2680,7 @@ function onCustomerPick(custId) {
   // Remember the default km on the FSO so the day form can use it
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (fso) { fso.header._defaultKm = c.defaultKm || 0; }
+  updateFolderPreview();                      // the customer name is part of the folder name
 }
 
 function onBoilerPick(boilerNo) {
@@ -2667,7 +2708,8 @@ function addDepartmentInline(fromList) {
 const HEADER_LABELS = {
   customer:'Customer', addressSite:'Site', jobType:'Job Type', department:'Department', date:'Date', time:'Time',
   officialNo:'Official FSO No.', jtContractNo:'JT Contract', boilerNo:'Boiler No.', customerPONo:'Customer PO',
-  customerVATNo:'Customer VAT', accountNo:'Account No.', description:'Description'
+  customerVATNo:'Customer VAT', accountNo:'Account No.', description:'Description',
+  folderDesc:'Folder description'
 };
 
 function saveHeaderForm(silent) {
@@ -2695,6 +2737,38 @@ function saveHeaderForm(silent) {
   fso.header.customerVATNo      = document.getElementById('hf-vatnr').value.trim();
   fso.header.accountNo          = document.getElementById('hf-accnr').value.trim();
   fso.header.description        = document.getElementById('hf-desc').value.trim();
+  fso.header.folderDesc         = document.getElementById('hf-folderdesc').value.trim();
+  // Renaming an FSO that already has documents means a NEW OneDrive folder: the
+  // old one and its PDFs stay where they are (they are immutable) and revision
+  // numbering starts again in the new folder. Never let that happen silently.
+  // Not on the silent save (adding a customer mid-edit) — the real save happens
+  // when the screen is left, and that is where the question belongs.
+  if (fso.docsBuiltAt && !silent) {
+    const wasTitle = fsoDocTitleFrom((old.officialNo || '').trim() || fso.fsoNumber, old.customer,
+                                     ((old.folderDesc || '').trim() || (old.description || '')));
+    const nowTitle = fsoDocTitle(fso);
+    if (wasTitle && nowTitle && wasTitle !== nowTitle) {
+      const ok = confirm('The documents folder name changes:\n\nfrom:  ' + wasTitle +
+        '\nto:      ' + nowTitle +
+        '\n\nThe existing folder and the PDFs in it are never changed. The next ' +
+        'Create / Update job builds a NEW folder, and its PDF revision numbering ' +
+        'starts at the first PDF again.\n\nRename the folder?');
+      if (!ok) {
+        fso.header.folderDesc = old.folderDesc || '';
+        fso.header.description = old.description || '';
+        document.getElementById('hf-folderdesc').value = fso.header.folderDesc;
+        document.getElementById('hf-desc').value = fso.header.description;
+        updateFolderPreview();
+        toast('Folder name kept as ' + wasTitle);
+      } else {
+        // The cached link points at the old folder — make the app resolve the new one.
+        fso.jobFolderUrl = '';
+        fso.docsBuiltAt = 0;
+        addHistory(fso, 'Documents folder renamed: "' + wasTitle + '" → "' + nowTitle +
+                        '" (previous folder and its PDFs left untouched)');
+      }
+    }
+  }
   if (cust && cust.defaultKm) fso.header._defaultKm = cust.defaultKm;
   // Log per-field changes
   Object.keys(HEADER_LABELS).forEach(k => {
@@ -5075,12 +5149,26 @@ function sanitizeName(s, max) {
   if (/^(_vti_|~\$)/i.test(n) || /^forms$/i.test(n)) n = 'x ' + n;
   return n;
 }
+// Built from the SHORT folder description when one is entered, otherwise from
+// the full job description (so every FSO named by an earlier version keeps its
+// existing folder, file names and PDF revision history).
+function fsoDocTitleFrom(numberText, customer, desc) {
+  const parts = [(numberText || '').trim()];
+  if (customer) parts.push(customer);
+  // NOTE: the description is used whole, not first-line-only. sanitizeName
+  // collapses the line breaks to spaces, which is exactly what earlier versions
+  // produced — so an FSO with no folder description keeps the folder name, file
+  // names and PDF revision history it already has in OneDrive.
+  if (desc) parts.push(desc);
+  return sanitizeName(parts.join(' '), 110);
+}
+function fsoFolderDesc(h) {
+  return ((h && h.folderDesc) || '').trim() || ((h && h.description) || '');
+}
 function fsoDocTitle(fso) {
   const h = fso.header || {};
-  const parts = [(h.officialNo || '').trim() || fso.fsoNumber];
-  if (h.customer) parts.push(h.customer);
-  if (h.description) parts.push(h.description);
-  return sanitizeName(parts.join(' '), 110) || fso.fsoNumber;
+  const numberText = (h.officialNo || '').trim() || fso.fsoNumber;
+  return fsoDocTitleFrom(numberText, h.customer, fsoFolderDesc(h)) || fso.fsoNumber;
 }
 
 // ---- Build an FSO workbook SERVER-SIDE ----------------------------------
