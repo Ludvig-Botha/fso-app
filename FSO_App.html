@@ -896,6 +896,14 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <div style="color:var(--grey)">›</div>
     </div>
+    <div class="list-item" onclick="odSelfTest()">
+      <div class="icon-circle" style="background:var(--blue-light)">🩺</div>
+      <div class="list-item-main">
+        <div class="list-item-title">OneDrive self-test</div>
+        <div class="list-item-sub">Runs every export step and names the one that fails</div>
+      </div>
+      <div style="color:var(--grey)">›</div>
+    </div>
     <div style="height:env(safe-area-inset-bottom)"></div>
   </div>
 </div>
@@ -1361,7 +1369,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.9.0';
+const APP_VERSION = '2.9.1';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -3463,7 +3471,7 @@ async function previewFsoPdf() {
     const xlsxBytes = await generateXLSXFilled(fso);
     const item = await odPutFile(prevFolderId, fsoDocTitle(fso) + ' PREVIEW.xlsx', xlsxBytes,
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    const pdfBytes = await odConvertToPdf(item.id);
+    const pdfBytes = await odConvertToPdf(item.id, item.name);
     const blob = new Blob([pdfBytes], { type: 'application/pdf' });
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     previewUrl = URL.createObjectURL(blob);
@@ -3520,7 +3528,7 @@ async function createOrUpdateJob() {
   } catch (e) {
     console.error(e);
     logError('createOrUpdateJob', e);
-    toast('Job update failed: ' + (e.message || e));
+    toast('Job update failed: ' + (e.message || e) + ' — see Settings > Report a Bug');
   }
 }
 
@@ -4743,7 +4751,31 @@ async function gFetch(method, path, opts) {
   const res = await fetch(OD_GRAPH + path, { method, headers: h, body: payload });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
-    throw new Error('Graph ' + res.status + ': ' + txt.slice(0, 300));
+    // A bare "Graph 400: invalidRequest" is unusable in the field — it never says
+    // WHICH call failed. Every Graph failure now carries the method, the URL and
+    // the real error code, and is written to the bug log automatically.
+    let code = '', msg = '';
+    try {
+      const j = JSON.parse(txt);
+      const err = j.error || {};
+      code = err.code || '';
+      msg = err.message || '';
+      const inner = err.innerError || err.innererror;
+      if (inner && inner.code && inner.code !== code) code += '/' + inner.code;
+    } catch (e) { msg = txt.slice(0, 200); }
+    // NOTE: the 'Graph <status>' prefix is load-bearing — gFetchWb and
+    // odConvertToPdf test for it to decide what is retryable.
+    const e = new Error('Graph ' + res.status + ' ' + (code || 'error') +
+      ' on ' + method + ' ' + decodeURIComponent(path) +
+      (msg ? ' — ' + msg : ''));
+    e.status = res.status; e.graphCode = code; e.graphMethod = method; e.graphPath = path;
+    // opts.quiet is set on the "does this exist?" probes, whose 404 is normal
+    // and would otherwise flood the 200-entry bug log.
+    if (!opts.quiet) {
+      try { logAction('GRAPH FAIL ' + res.status + ' ' + method + ' ' + decodeURIComponent(path) +
+        ' — ' + (code || '') + ' ' + (msg || txt.slice(0, 200)), 'error'); } catch (x) {}
+    }
+    throw e;
   }
   if (opts.raw) return new Uint8Array(await res.arrayBuffer());
   if (res.status === 204) return null;
@@ -4754,22 +4786,42 @@ async function gFetch(method, path, opts) {
 // ---- Folders & files ---------------------------------------------------
 async function odEnsureFolder() {
   const cfg = odCfg();
-  const name = (cfg.folderName || 'FSO App').trim();
+  const name = sanitizeName((cfg.folderName || 'FSO App'), 100) || 'FSO App';
   try {
-    const item = await gFetch('GET', '/me/drive/root:/' + encodeURIComponent(name));
+    const item = await gFetch('GET', '/me/drive/root:/' + encodeURIComponent(name), { quiet: true });
     cfg.folderId = item.id; saveData(); return item.id;
   } catch (e) {
-    const item = await gFetch('POST', '/me/drive/root/children',
-      { json: { name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' } });
-    cfg.folderId = item.id; saveData(); return item.id;
+    try {
+      const item = await gFetch('POST', '/me/drive/root/children',
+        { json: { name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' } });
+      cfg.folderId = item.id; saveData(); return item.id;
+    } catch (e2) {
+      // The folder can exist even though the lookup failed (transient 5xx, or a
+      // 409 race) — one more lookup before the whole export dies.
+      try {
+        const item = await gFetch('GET', '/me/drive/root:/' + encodeURIComponent(name), { quiet: true });
+        cfg.folderId = item.id; saveData(); return item.id;
+      } catch (e3) {}
+      throw new Error('Could not open or create the OneDrive folder "' + name + '" — ' + (e2.message || e2));
+    }
   }
 }
 async function odEnsureChildFolder(parentId, name) {
+  if (!parentId) throw new Error('No parent folder id when creating "' + name + '"');
+  const safe = sanitizeName(name, 110);
+  if (!safe) throw new Error('Refusing to create a folder with an empty name (from "' + name + '")');
+  const byPath = '/me/drive/items/' + parentId + ':/' + encodeURIComponent(safe);
   try {
-    return (await gFetch('GET', '/me/drive/items/' + parentId + ':/' + encodeURIComponent(name))).id;
+    return (await gFetch('GET', byPath, { quiet: true })).id;
   } catch (e) {
-    return (await gFetch('POST', '/me/drive/items/' + parentId + '/children',
-      { json: { name, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' } })).id;
+    try {
+      return (await gFetch('POST', '/me/drive/items/' + parentId + '/children',
+        { json: { name: safe, folder: {}, '@microsoft.graph.conflictBehavior': 'fail' } })).id;
+    } catch (e2) {
+      // Same self-heal as above: a 409 nameAlreadyExists means it IS there.
+      try { return (await gFetch('GET', byPath, { quiet: true })).id; } catch (e3) {}
+      throw new Error('Could not create folder "' + safe + '" — ' + (e2.message || e2));
+    }
   }
 }
 async function odEnsureBookFolder(book) {
@@ -4791,12 +4843,26 @@ async function odPutJson(folderId, name, obj) {
 }
 async function odGetJson(folderId, name) {
   try {
-    const txt = await gFetch('GET', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(name) + ':/content');
+    const txt = await gFetch('GET', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(name) + ':/content', { quiet: true });
     return typeof txt === 'string' ? JSON.parse(txt) : txt;
   } catch (e) { return null; }
 }
 async function odPutFile(folderId, name, bytes, mime) {
-  return gFetch('PUT', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(name) + ':/content',
+  // Guard rails: every one of these used to surface as an opaque Graph 400.
+  if (!folderId) throw new Error('No folder id when uploading "' + name + '"');
+  const safe = sanitizeName(name, 200);
+  if (!safe) throw new Error('Refusing to upload a file with an empty name (from "' + name + '")');
+  if (!bytes || !bytes.length) throw new Error('Refusing to upload "' + safe + '": 0 bytes');
+  if (bytes.length > 4 * 1024 * 1024) {
+    // Graph's simple PUT now takes up to 250 MB, but an FSO workbook this big
+    // means something is wrong (a runaway attachment) — record it, don't block.
+    try { logAction('Large upload: "' + safe + '" ' + Math.round(bytes.length / 1048576) + ' MB', 'error'); } catch (x) {}
+  }
+  if (bytes.length > 240 * 1024 * 1024) {
+    throw new Error('"' + safe + '" is ' + Math.round(bytes.length / 1048576) +
+      ' MB — beyond the 250 MB direct-upload limit; an upload session is needed');
+  }
+  return gFetch('PUT', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(safe) + ':/content',
     { body: bytes, headers: { 'Content-Type': mime } });
 }
 
@@ -4806,11 +4872,21 @@ async function odPutFile(folderId, name, bytes, mime) {
 // characters are stripped and the whole thing is length-capped so long
 // descriptions can never break the upload.
 function sanitizeName(s, max) {
-  return String(s || '')
-    .replace(/[\\/:*?"<>|#%~&{}]+/g, ' ')
+  let n = String(s || '')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')          // control chars (pasted text)
+    .replace(/[\\/:*?"<>|#%~&{}\[\]^]+/g, ' ')         // OneDrive + SharePoint reserved
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, max || 90);
+    .slice(0, max || 90)
+    // OneDrive rejects a name that ENDS in a full stop or a space with a bare
+    // 400 invalidRequest. The slice above can create exactly that, and a job
+    // description ending in "...No. 3." does it on its own. Strip both ends.
+    .replace(/[.\s]+$/, '')
+    .replace(/^[.\s]+/, '');
+  // Windows/SharePoint reserved words and prefixes that the API refuses.
+  if (/^(CON|PRN|AUX|NUL|COM\d|LPT\d)$/i.test(n)) n += '_';
+  if (/^(_vti_|~\$)/i.test(n) || /^forms$/i.test(n)) n = 'x ' + n;
+  return n;
 }
 function fsoDocTitle(fso) {
   const h = fso.header || {};
@@ -4901,7 +4977,7 @@ async function odMakeFsoPdf(fso) {
   const xlsxBytes = await generateXLSXFilled(fso);
   const item = await odPutFile(folderId, xlsxName, xlsxBytes,
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  const pdfBytes = await odConvertToPdf(item.id);
+  const pdfBytes = await odConvertToPdf(item.id, xlsxName);
   const pdfName = await odNextPdfName(folderId, title + ' FSO');
   await odPutFile(folderId, pdfName, pdfBytes, 'application/pdf');
   if (pdfName !== title + ' FSO.pdf') addHistory(fso, 'PDF revision exported: ' + pdfName + ' (original untouched)');
@@ -4915,19 +4991,114 @@ async function odMakeFsoPdf(fso) {
 // Convert a drive item to PDF. A file that was written moments ago can still
 // be locked by the service (423 resourceLocked) or not yet indexed (404), so
 // this waits and retries rather than failing the whole export.
-async function odConvertToPdf(itemId) {
+async function odConvertToPdf(itemId, label) {
+  if (!itemId) throw new Error('No drive item id to convert to PDF' + (label ? ' (' + label + ')' : ''));
   let last;
   for (let i = 0; i < 8; i++) {
     try {
-      return await gFetch('GET', '/me/drive/items/' + itemId + '/content?format=pdf', { raw: true });
+      const pdf = await gFetch('GET', '/me/drive/items/' + itemId + '/content?format=pdf', { raw: true });
+      if (!pdf || !pdf.length) throw new Error('PDF conversion returned 0 bytes' + (label ? ' for ' + label : ''));
+      return pdf;
     } catch (e) {
       last = e;
       const m = String(e.message || '');
-      if (!/Graph (404|409|423|429|500|502|503|504)/.test(m)) throw e;
+      if (!/Graph (404|409|423|429|500|502|503|504)/.test(m)) {
+        e.message = 'PDF conversion failed' + (label ? ' for "' + label + '"' : '') + ': ' + m;
+        throw e;
+      }
       await new Promise(r => setTimeout(r, 1500 + i * 1000));
     }
   }
   throw last;
+}
+
+// ---- OneDrive self-test -------------------------------------------------
+// Walks the SAME Graph calls "Create / Update job" makes, one step at a time,
+// and reports exactly which step fails, with the method, the URL and the Graph
+// error code. Nothing here touches real job data: everything is written to a
+// "_selftest" folder, and the folder-name steps only prove the names are legal.
+async function odSelfTest() {
+  if (!odIsConfigured()) { alert('Enter the OneDrive Client ID first (Settings > SharePoint & OneDrive).'); return; }
+  if (!odIsConnected()) { alert('Connect to OneDrive first (Settings > SharePoint & OneDrive).'); return; }
+  if (!isOnline()) { alert('The self-test needs an internet connection.'); return; }
+  const lines = [];
+  let failed = false;
+  const step = async (label, fn) => {
+    const t0 = Date.now();
+    try {
+      const r = await fn();
+      lines.push('OK   ' + label + (r ? '  ->  ' + r : '') + '   [' + (Date.now() - t0) + 'ms]');
+      return r;
+    } catch (e) {
+      failed = true;
+      lines.push('FAIL ' + label + '\n       ' + (e.message || e));
+      throw e;
+    }
+  };
+  toast('Running OneDrive self-test...');
+  let rootId = null, testId = null, upItem = null;
+  try {
+    await step('Token + account', async () => {
+      await odToken();
+      return ((odAccount && odAccount.username) || '?') + '  scopes: ' + odScopes().join(' ');
+    });
+    await step('Read the drive', async () => {
+      const d = await gFetch('GET', '/me/drive?$select=id,driveType');
+      return (d && d.driveType) + ' drive';
+    });
+    rootId = await step('Root folder "' + (odCfg().folderName || 'FSO App') + '"', () => odEnsureFolder());
+    testId = await step('Create/find "_selftest" folder', () => odEnsureChildFolder(rootId, '_selftest'));
+    await step('Upload a small text file', async () => {
+      const it = await odPutFile(testId, 'selftest.txt',
+        new TextEncoder().encode('selftest ' + new Date().toISOString()), 'text/plain');
+      return it.name;
+    });
+    const fso = ctx.fsoId ? getFso(ctx.fsoId, ctx.bookId) : null;
+    const book = fso ? APP.books[fso.bookId] : null;
+    if (book) {
+      await step('Book folder name "' + workbookName(book) + '"',
+        () => odEnsureChildFolder(testId, workbookName(book)));
+    }
+    if (fso) {
+      await step('Job folder name "' + fsoDocTitle(fso) + '"',
+        () => odEnsureChildFolder(testId, fsoDocTitle(fso)));
+    }
+    await step('Build + upload the FSO workbook', async () => {
+      const bytes = fso ? await generateXLSXFilled(fso)
+        : Uint8Array.from(atob(TEMPLATE_XLSX_B64), c => c.charCodeAt(0));
+      upItem = await odPutFile(testId, 'selftest.xlsx', bytes,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      return Math.round(bytes.length / 1024) + ' KB uploaded';
+    });
+    await step('Convert it to PDF (?format=pdf)', async () => {
+      const pdf = await odConvertToPdf(upItem.id, 'selftest.xlsx');
+      return Math.round(pdf.length / 1024) + ' KB PDF returned';
+    });
+    if (spCfg().uploadEnabled && ctx.fsoId) {
+      const fso2 = getFso(ctx.fsoId, ctx.bookId);
+      const spUrl = fso2 && (fso2.spFolderUrl || '').trim();
+      if (spUrl) {
+        await step('Read the SharePoint job folder', async () => {
+          const kids = await gFetch('GET', '/shares/' + spShareId(spUrl) + '/driveItem/children?$select=name&$top=5');
+          return ((kids && kids.value) || []).length + ' item(s) visible';
+        });
+      } else {
+        lines.push('SKIP SharePoint job folder - no folder URL on this FSO');
+      }
+    } else {
+      lines.push('SKIP SharePoint upload - toggle off or no FSO open');
+    }
+  } catch (e) { /* the failing step is already in `lines` */ }
+  lines.push(failed ? '\nStopped at the first failure above - that is the call to fix.'
+                    : '\nAll steps passed.');
+  const report = 'ONEDRIVE SELF-TEST  v' + APP_VERSION + '  ' + new Date().toLocaleString() +
+    '\n' + (navigator.userAgent || '') + '\n\n' + lines.join('\n');
+  logAction(report, failed ? 'error' : 'action');
+  let copied = false;
+  try { await navigator.clipboard.writeText(report); copied = true; } catch (e) {}
+  console.log(report);
+  alert(report + '\n\n' + (copied ? 'Copied to the clipboard. ' : '') +
+    'Also saved in Settings > Report a Bug.');
 }
 
 // ---- SharePoint upload via the Graph shares endpoint --------------------

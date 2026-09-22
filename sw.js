@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fso-cache-v23';
+const CACHE_NAME = 'fso-cache-v24';
 // Local shell assets — install fails if these can't be cached (correct: the app
 // can't work without them).
 const CORE_ASSETS = [
