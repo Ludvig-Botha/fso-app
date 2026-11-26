@@ -142,6 +142,28 @@ textarea.form-control{min-height:80px;resize:vertical}
 .nav-card .nav-icon{font-size:2rem;margin-bottom:8px}
 .nav-card .nav-title{font-size:1rem;font-weight:600}
 .nav-card .nav-sub{font-size:.8rem;color:var(--grey);margin-top:4px}
+/* SharePoint shortcuts (v2.10.0) */
+.link-off{filter:grayscale(1);opacity:.45}
+.pin-btn{background:none;border:none;font-size:1.3rem;color:var(--grey);padding:6px 4px;cursor:pointer;line-height:1;flex-shrink:0}
+.pin-btn.on{color:#f59e0b}
+.pin-row-label{font-size:.75rem;color:var(--grey);font-weight:500;margin-bottom:6px}
+.pin-row{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 8px;margin-bottom:10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pin-row::-webkit-scrollbar{display:none}
+.pin-chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:9px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-family:inherit;font-size:.85rem;font-weight:600;color:#111827;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow)}
+.pin-chip:active{transform:scale(.97)}
+body.dark .pin-chip{background:#1b2536;color:#e8edf4}
+.offline-banner{display:none;align-items:center;gap:8px;padding:10px 16px;background:var(--orange-light);color:var(--orange);font-size:.82rem;font-weight:500}
+.lk-card{padding:12px}
+.lk-head{display:flex;gap:8px;margin-bottom:8px}
+.lk-icon{width:3.4em;flex:0 0 3.4em;text-align:center;padding:11px 4px}
+.lk-url{font-size:.8rem;margin-bottom:6px}
+.lk-tools{display:flex;align-items:center;gap:4px}
+.lk-tb{width:34px;height:34px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:.95rem;cursor:pointer;color:inherit;padding:0}
+.lk-pin{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--grey)}
+.lk-children{margin-top:10px;padding-left:12px;border-left:3px solid var(--blue-light)}
+.lk-child{margin-bottom:12px}
+.lk-addsub{background:none;border:none;color:var(--blue);font-family:inherit;font-size:.82rem;font-weight:600;padding:4px 0;cursor:pointer}
+.lk-bad{border-color:var(--red)!important}
 /* Stats row */
 .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
 .stat-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center}
@@ -386,6 +408,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <div class="stat-label">Done</div>
       </div>
     </div>
+    <!-- Pinned SharePoint shortcuts (quick-access row) -->
+    <div id="home-pins"></div>
     <!-- Nav cards -->
     <div class="nav-grid">
       <div class="nav-card" onclick="goTo('screen-active')">
@@ -407,6 +431,16 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <div class="nav-icon">📊</div>
         <div class="nav-title">Timesheets</div>
         <div class="nav-sub">Monthly, from day cards</div>
+      </div>
+      <div class="nav-card" id="home-card-sp" onclick="goTo('screen-sp-links')">
+        <div class="nav-icon">🔗</div>
+        <div class="nav-title">SharePoint</div>
+        <div class="nav-sub" id="home-sp-sub">Company pages &amp; forms</div>
+      </div>
+      <div class="nav-card" id="home-card-audit" onclick="openAuditApp()">
+        <div class="nav-icon">🔍</div>
+        <div class="nav-title">Audit Report</div>
+        <div class="nav-sub" id="home-audit-sub">Open the audit app</div>
       </div>
       <div class="nav-card" onclick="goTo('screen-settings')">
         <div class="nav-icon">⚙️</div>
@@ -838,6 +872,14 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <div style="color:var(--grey)">›</div>
     </div>
+    <div class="list-item" onclick="openLinksSettings()">
+      <div class="icon-circle" style="background:var(--blue-light)">🔗</div>
+      <div class="list-item-main">
+        <div class="list-item-title">SharePoint shortcuts</div>
+        <div class="list-item-sub">Links for the SharePoint &amp; Audit Report buttons</div>
+      </div>
+      <div style="color:var(--grey)">›</div>
+    </div>
     <div class="list-item" onclick="goTo('screen-settings-onedrive')">
       <div class="icon-circle" style="background:var(--blue-light)">☁️</div>
       <div class="list-item-main">
@@ -1166,6 +1208,74 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
 </div>
 
 <!-- ============================================================ -->
+<!-- SHAREPOINT SHORTCUTS (v2.10.0) -->
+<!-- ============================================================ -->
+<div id="screen-sp-links" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h1>SharePoint</h1>
+    <button class="icon-btn" onclick="openLinksSettings()" title="Edit links">⚙️</button>
+  </div>
+  <div class="body-no-pad">
+    <div class="offline-banner" id="sp-links-offline">📵 Offline — SharePoint needs internet, so the links are greyed out.</div>
+    <div id="sp-links-list"></div>
+    <p style="font-size:.75rem;color:var(--grey);padding:12px 16px;line-height:1.5">Tap ☆ to pin a link to the home screen. Links open in the browser; press back to return to the app.</p>
+  </div>
+</div>
+
+<div id="screen-sp-group" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <h1 id="sp-group-title">Links</h1>
+    <button class="icon-btn" onclick="openLinksSettings()" title="Edit links">⚙️</button>
+  </div>
+  <div class="body-no-pad">
+    <div class="offline-banner" id="sp-group-offline">📵 Offline — SharePoint needs internet, so the links are greyed out.</div>
+    <div id="sp-group-list"></div>
+  </div>
+</div>
+
+<div id="screen-settings-links" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="saveLinksSettings()">←</button>
+    <h1>SharePoint shortcuts</h1>
+    <button class="icon-btn" onclick="saveLinksSettings()">✓</button>
+  </div>
+  <div class="body">
+    <div class="card">
+      <p style="font-size:.78rem;color:var(--grey);line-height:1.5">
+        Open each page in your browser, copy the address bar and paste it here. Only secure
+        <span class="mono">https://</span> links are accepted; anything else is refused and never opened.
+        Leave a link blank if you don't use it. Saved links are included in your backups.
+      </p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Audit Report app</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>Audit app URL (home-screen button)</label>
+        <input class="form-control mono lk-url" id="lk-audit" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="lkTestAudit()">Test link ↗</button>
+    </div>
+    <div class="section-label" style="padding-left:2px">SharePoint buttons</div>
+    <div id="lk-list"></div>
+    <button class="btn btn-secondary" onclick="lkAdd()" style="margin-bottom:12px">+ Add button</button>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:10px">Share &amp; reset</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="shareLinks()">⤴ Share links</button>
+        <label class="btn btn-secondary btn-sm" style="flex:1;cursor:pointer;text-align:center">⤵ Import links<input type="file" accept=".json,application/json" style="display:none" onchange="importLinks(event)"></label>
+      </div>
+      <button class="btn btn-secondary btn-sm" style="width:100%" onclick="lkReset()">Reset to the standard list</button>
+      <p style="font-size:.75rem;color:var(--grey);margin-top:8px;line-height:1.5">
+        Share creates a small file with the button names and links (no pins, no job data) that another
+        engineer can import. Imported links are checked: anything that isn't https is removed.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
 <!-- SETTINGS PIN CHANGE -->
 <!-- ============================================================ -->
 <div id="screen-settings-pin" class="screen">
@@ -1384,7 +1494,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.9.4';
+const APP_VERSION = '2.10.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -1609,6 +1719,9 @@ function showScreen(id) {
       case 'screen-settings-sharepoint': renderSettingsSharePoint(); break;
       case 'screen-settings-material': renderSettingsMaterial(); break;
       case 'screen-settings-onedrive': renderSettingsOneDrive(); break;
+      case 'screen-sp-links': renderSpLinks(); break;
+      case 'screen-sp-group': renderSpGroup(); break;
+      case 'screen-settings-links': renderSettingsLinks(); break;
     }
   } catch (err) {
     showErrorScreen(err, 'render ' + id);
@@ -1957,6 +2070,7 @@ function statusIcon(status) {
 // HOME RENDER
 // ============================================================
 function renderHome() {
+  try { renderHomeLinks(); } catch (e) { console.warn('home links', e); }
   const book = activeBook();
   document.getElementById('home-book-badge').textContent = book
     ? book.config.fsoRangeStart + ' – ' + book.config.fsoRangeEnd : '—';
@@ -4686,7 +4800,7 @@ function saveMaterialLink() {
 function openMaterialLink() {
   const v = document.getElementById('material-link').value.trim();
   if (!v) { toast('No link set'); return; }
-  window.open(v, '_blank');
+  safeOpenUrl(v, 'Stores / Material');
 }
 
 // ============================================================
@@ -4741,7 +4855,7 @@ function openSpRegister() {
   const url = (inp && document.getElementById('screen-settings-sharepoint').classList.contains('active'))
     ? inp.value.trim() : (sp.registerUrl || '');
   if (!url) { toast('No registration link set — add it in Settings → SharePoint'); return; }
-  window.open(url, '_blank');
+  safeOpenUrl(url, 'job registration');
 }
 
 // Opens the OneDrive folder that holds this book's workbook + job folders.
@@ -4756,13 +4870,13 @@ function openWorkbookFolder() {
     toast('No OneDrive folder link yet — sync once, or paste it in Settings → SharePoint & OneDrive');
     return;
   }
-  window.open(url, '_blank');
+  safeOpenUrl(url, 'OneDrive folder');
 }
 function openOneDriveFolder() {
   const inp = document.getElementById('sp-onedrive-url');
   const url = inp ? inp.value.trim() : (spCfg().oneDriveFolderUrl || '');
   if (!url) { toast('No OneDrive folder link set'); return; }
-  window.open(url, '_blank');
+  safeOpenUrl(url, 'OneDrive folder');
 }
 
 // Opens this FSO's pasted SharePoint job folder.
@@ -4772,7 +4886,428 @@ function openSpFolder() {
   const onHeader = document.getElementById('screen-header-form').classList.contains('active');
   const url = (onHeader && inline) ? inline.value.trim() : ((fso && fso.spFolderUrl) || '');
   if (!url) { toast('No job folder link pasted for this FSO yet'); return; }
-  window.open(url, '_blank');
+  safeOpenUrl(url, 'job folder');
+}
+
+// ============================================================
+// SHAREPOINT SHORTCUTS (v2.10.0)
+// Quick links to company SharePoint pages. Each engineer pastes their own
+// URLs under Settings → SharePoint shortcuts. Stored in APP.settings.links,
+// so they travel with the normal backup / backup-latest.json automatically.
+// SECURITY: only https:// links are ever opened (checked on save AND on open,
+// so a tampered backup or shared file can't sneak a javascript:/http: link in).
+// ============================================================
+const LINK_DEFAULTS = [
+  { id: 'rfp',           icon: '📄', label: 'RFP page' },
+  { id: 'eng-ar',        icon: '🛠️', label: 'Engineering action request' },
+  { id: 'svc-ar',        icon: '🔧', label: 'Service action request' },
+  { id: 'nrg-ar',        icon: '⚡', label: 'Energy action request' },
+  { id: 'travel',        icon: '✈️', label: 'Travel Request' },
+  { id: 'svc-docs',      icon: '📂', label: 'Service Department documents' },
+  { id: 'fsos',          icon: '📋', label: "FSO's" },
+  { id: 'standby',       icon: '📅', label: 'Standby roster' },
+  { id: 'sheq',          icon: '🦺', label: 'SHEQ documents' },
+  { id: 'timesheets',    icon: '⏱️', label: 'Timesheets' },
+  { id: 'claims',        icon: '💳', label: 'Finance Claims', children: [
+    { id: 'claims-export', icon: '🌍', label: 'Export claims' },
+    { id: 'claims-local',  icon: '🏠', label: 'Local Claims' },
+    { id: 'claims-ota',    icon: '🧾', label: 'OTA claims' }
+  ] },
+  { id: 'commissioning', icon: '🏭', label: 'Commissioning' }
+];
+
+function linkNode(d) {
+  return { id: d.id, icon: d.icon || '🔗', label: d.label || '', url: d.url || '', pinned: !!d.pinned,
+           children: (d.children || []).map(linkNode) };
+}
+function linksCfg() {
+  if (!APP.settings.links || !Array.isArray(APP.settings.links.items)) {
+    APP.settings.links = { audit: '', items: LINK_DEFAULTS.map(linkNode) };
+  }
+  const L = APP.settings.links;
+  if (typeof L.audit !== 'string') L.audit = '';
+  L.items.forEach(it => { if (!Array.isArray(it.children)) it.children = []; });
+  return L;
+}
+function newLinkId() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function linkHost(url) { try { return new URL(url).host; } catch (e) { return ''; } }
+function shortIcon(v) { return Array.from(String(v || '🔗')).slice(0, 3).join('') || '🔗'; }
+
+// Returns null when the link is acceptable (or blank), otherwise a reason.
+function linkUrlProblem(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  let u;
+  try { u = new URL(s); } catch (e) { return 'is not a valid web address'; }
+  if (u.protocol !== 'https:') return 'must start with https://';
+  if (u.username || u.password) return 'contains login details — not allowed';
+  return null;
+}
+
+// The ONE place the app opens a user-entered link.
+function safeOpenUrl(raw, what) {
+  const s = String(raw || '').trim();
+  if (!s) { toast('No link set' + (what ? ' for ' + what : '') + ' — add it in Settings'); return false; }
+  const p = linkUrlProblem(s);
+  if (p) {
+    toast('Blocked: the ' + (what || '') + ' link ' + p);
+    if (typeof logAction === 'function') logAction('blocked link (' + (what || '?') + '): ' + p, 'error');
+    return false;
+  }
+  if (!isOnline()) { toast('Offline — ' + (what || 'this page') + ' needs an internet connection'); return false; }
+  // A new browsing context: the app stays exactly where it was underneath, so
+  // closing the page / pressing back returns straight into the app. (SharePoint
+  // refuses to be framed inside another site, so an in-app iframe isn't possible.)
+  window.open(new URL(s).href, '_blank', 'noopener');
+  return true;
+}
+
+function findLink(id) {
+  for (const it of linksCfg().items) {
+    if (it.id === id) return { item: it, parent: null };
+    for (const c of it.children) if (c.id === id) return { item: c, parent: it };
+  }
+  return null;
+}
+
+// Tapping a button: groups open their sub-list, links open the page.
+function openLinkById(id) {
+  const f = findLink(id);
+  if (!f) { toast('That link no longer exists'); return; }
+  if (f.item.children.length) { goTo('screen-sp-group', { linkId: id }); return; }
+  safeOpenUrl(f.item.url, f.item.label);
+}
+// A group's own main-page URL (optional).
+function openLinkUrl(id) {
+  const f = findLink(id);
+  if (f) safeOpenUrl(f.item.url, f.item.label);
+}
+function openAuditApp() { safeOpenUrl(linksCfg().audit, 'Audit Report app'); }
+
+function togglePin(id) {
+  const f = findLink(id);
+  if (!f) return;
+  f.item.pinned = !f.item.pinned;
+  saveData();
+  toast(f.item.pinned ? '★ Pinned to home screen' : 'Removed from home screen');
+  refreshNetUi();
+}
+
+function linkRowHtml(it, urlOnly) {
+  const off = !isOnline();
+  const isGroup = !urlOnly && it.children.length > 0;
+  let sub;
+  if (isGroup) {
+    const unset = it.children.filter(c => !c.url).length;
+    sub = it.children.length + ' links' + (unset ? ' · ' + unset + ' not set' : '');
+  } else {
+    sub = it.url ? linkHost(it.url) : 'Not set — tap ⚙️ to add the link';
+  }
+  const dim = !isGroup && (off || !it.url);
+  const label = urlOnly ? 'Open ' + it.label + ' main page' : it.label;
+  const click = urlOnly ? 'openLinkUrl(&#39;' + it.id + '&#39;)' : 'openLinkById(&#39;' + it.id + '&#39;)';
+  return '<div class="list-item' + (dim ? ' link-off' : '') + '" onclick="' + click + '">' +
+    '<div class="icon-circle" style="background:var(--blue-light)">' + esc(it.icon) + '</div>' +
+    '<div class="list-item-main">' +
+      '<div class="list-item-title">' + esc(label) + '</div>' +
+      '<div class="list-item-sub">' + esc(sub) + '</div>' +
+    '</div>' +
+    (urlOnly ? '' : '<button class="pin-btn' + (it.pinned ? ' on' : '') + '" title="Pin to home screen" ' +
+      'onclick="event.stopPropagation();togglePin(&#39;' + it.id + '&#39;)">' + (it.pinned ? '★' : '☆') + '</button>') +
+    '<div style="color:var(--grey)">' + (isGroup ? '›' : '↗') + '</div>' +
+  '</div>';
+}
+
+function renderSpLinks() {
+  const L = linksCfg();
+  document.getElementById('sp-links-offline').style.display = isOnline() ? 'none' : 'flex';
+  const any = !!L.audit || L.items.some(it => it.url || it.children.some(c => c.url));
+  document.getElementById('sp-links-list').innerHTML =
+    (any ? '' : '<div class="card" style="margin:12px 16px"><p style="font-size:.85rem;line-height:1.5">No links set yet. ' +
+      'Tap ⚙️ at the top to paste the address of each page.</p></div>') +
+    L.items.map(it => linkRowHtml(it, false)).join('');
+}
+
+function renderSpGroup() {
+  const f = findLink(ctx.linkId);
+  const el = document.getElementById('sp-group-list');
+  document.getElementById('sp-group-offline').style.display = isOnline() ? 'none' : 'flex';
+  if (!f) { el.innerHTML = '<div class="empty-state"><p>This group no longer exists</p></div>'; return; }
+  const g = f.item;
+  document.getElementById('sp-group-title').textContent = g.label;
+  el.innerHTML = (g.url ? linkRowHtml(g, true) : '') +
+    (g.children.length ? g.children.map(c => linkRowHtml(c, false)).join('')
+                       : '<div class="empty-state"><p>No sub-links in this group</p></div>');
+}
+
+// Home: pinned quick-access row + SharePoint / Audit cards (greyed when offline).
+function renderHomeLinks() {
+  const L = linksCfg();
+  const off = !isOnline();
+  const pins = [];
+  L.items.forEach(it => { if (it.pinned) pins.push(it); it.children.forEach(c => { if (c.pinned) pins.push(c); }); });
+  const box = document.getElementById('home-pins');
+  if (box) {
+    box.innerHTML = pins.length
+      ? '<div class="pin-row-label">PINNED</div><div class="pin-row">' + pins.map(p => {
+          const dim = !p.children.length && (off || !p.url);
+          return '<button class="pin-chip' + (dim ? ' link-off' : '') + '" onclick="openLinkById(&#39;' + p.id + '&#39;)">' +
+            '<span>' + esc(p.icon) + '</span>' + esc(p.label) + '</button>';
+        }).join('') + '</div>'
+      : '';
+  }
+  const sp = document.getElementById('home-card-sp');
+  if (sp) sp.classList.toggle('link-off', off);
+  const spSub = document.getElementById('home-sp-sub');
+  if (spSub) spSub.textContent = off ? 'Offline — needs internet' : 'Company pages & forms';
+  const au = document.getElementById('home-card-audit');
+  if (au) au.classList.toggle('link-off', off || !L.audit);
+  const auSub = document.getElementById('home-audit-sub');
+  if (auSub) auSub.textContent = !L.audit ? 'Set the link in Settings' : (off ? 'Offline — needs internet' : 'Open the audit app');
+}
+
+// Re-draw whatever link screen is showing when the connection changes.
+function refreshNetUi() {
+  const a = document.querySelector('.screen.active');
+  const id = a ? a.id : '';
+  try {
+    if (id === 'screen-home') renderHomeLinks();
+    else if (id === 'screen-sp-links') renderSpLinks();
+    else if (id === 'screen-sp-group') renderSpGroup();
+  } catch (e) { console.warn('refreshNetUi', e); }
+}
+
+// ---------- Settings → SharePoint shortcuts (editor) ----------
+let linksDraft = null;
+function openLinksSettings() {
+  linksDraft = JSON.parse(JSON.stringify(linksCfg()));
+  goTo('screen-settings-links');
+}
+function renderSettingsLinks() {
+  if (!linksDraft) linksDraft = JSON.parse(JSON.stringify(linksCfg()));
+  drawLinksEditor();
+}
+
+function drawLinksEditor() {
+  const D = linksDraft;
+  document.getElementById('lk-audit').value = D.audit || '';
+  const tb = (txt, call, title) => '<button class="lk-tb" title="' + title + '" onclick="' + call + '">' + txt + '</button>';
+  const rowEd = (it, i, c) => {
+    const isChild = c !== null;
+    const key = 'data-i="' + i + '"' + (isChild ? ' data-c="' + c + '"' : '');
+    const cc = isChild ? c : 'null';
+    const isGroup = !isChild && it.children.length > 0;
+    return '<div class="' + (isChild ? 'lk-child' : '') + '">' +
+      '<div class="lk-head">' +
+        '<input class="form-control lk-icon" ' + key + ' data-f="icon" maxlength="8" value="' + esc(it.icon) + '" aria-label="Icon">' +
+        '<input class="form-control" ' + key + ' data-f="label" maxlength="60" placeholder="Button name" value="' + esc(it.label) + '">' +
+      '</div>' +
+      '<input class="form-control mono lk-url" ' + key + ' data-f="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" ' +
+        'placeholder="' + (isGroup ? 'Optional — main page for this group' : 'https://…') + '" value="' + esc(it.url) + '">' +
+      '<div class="lk-tools">' +
+        '<label class="lk-pin"><input type="checkbox" ' + key + ' data-f="pinned"' + (it.pinned ? ' checked' : '') + '> Pin to home</label>' +
+        '<span style="flex:1"></span>' +
+        tb('↗', 'lkTest(' + i + ',' + cc + ')', 'Test link') +
+        tb('↑', 'lkMove(' + i + ',' + cc + ',-1)', 'Move up') +
+        tb('↓', 'lkMove(' + i + ',' + cc + ',1)', 'Move down') +
+        tb('🗑', 'lkDel(' + i + ',' + cc + ')', 'Remove') +
+      '</div>' +
+      (isChild ? '' : '<div class="lk-children"' + (it.children.length ? '' : ' style="border-left:none;padding-left:0;margin-top:6px"') + '>' +
+        it.children.map((ch, j) => rowEd(ch, i, j)).join('') +
+        '<button class="lk-addsub" onclick="lkAddChild(' + i + ')">+ Add sub-link</button></div>') +
+    '</div>';
+  };
+  document.getElementById('lk-list').innerHTML =
+    D.items.map((it, i) => '<div class="card lk-card">' + rowEd(it, i, null) + '</div>').join('');
+}
+
+function readLinksForm() {
+  const D = linksDraft;
+  if (!D) return;
+  document.querySelectorAll('#lk-list [data-f]').forEach(inp => {
+    const i = +inp.dataset.i;
+    const it = inp.dataset.c === undefined ? D.items[i] : (D.items[i] && D.items[i].children[+inp.dataset.c]);
+    if (!it) return;
+    const f = inp.dataset.f;
+    if (f === 'pinned') it.pinned = inp.checked;
+    else if (f === 'icon') it.icon = shortIcon(inp.value.trim());
+    else it[f] = inp.value.trim();
+  });
+  D.audit = document.getElementById('lk-audit').value.trim();
+}
+
+function lkArr(i, c) { return c === null ? linksDraft.items : linksDraft.items[i].children; }
+function lkMove(i, c, dir) {
+  readLinksForm();
+  const arr = lkArr(i, c), idx = c === null ? i : c, to = idx + dir;
+  if (to < 0 || to >= arr.length) return;
+  [arr[idx], arr[to]] = [arr[to], arr[idx]];
+  drawLinksEditor();
+}
+function lkDel(i, c) {
+  readLinksForm();
+  const arr = lkArr(i, c), idx = c === null ? i : c, it = arr[idx];
+  const extra = (c === null && it.children.length) ? ' and its ' + it.children.length + ' sub-link(s)' : '';
+  if (!confirm('Remove "' + (it.label || 'Untitled') + '"' + extra + '?')) return;
+  arr.splice(idx, 1);
+  drawLinksEditor();
+}
+function lkAdd() {
+  readLinksForm();
+  linksDraft.items.push(linkNode({ id: newLinkId(), icon: '🔗', label: 'New link' }));
+  drawLinksEditor();
+  const cards = document.querySelectorAll('#lk-list .lk-card');
+  if (cards.length) cards[cards.length - 1].scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function lkAddChild(i) {
+  readLinksForm();
+  linksDraft.items[i].children.push(linkNode({ id: newLinkId(), icon: '🔗', label: 'New sub-link' }));
+  drawLinksEditor();
+}
+function lkTest(i, c) {
+  readLinksForm();
+  const it = lkArr(i, c)[c === null ? i : c];
+  if (it) safeOpenUrl(it.url, it.label);
+}
+function lkTestAudit() { safeOpenUrl(document.getElementById('lk-audit').value, 'Audit Report app'); }
+
+function lkReset() {
+  if (!confirm('Reset to the standard list of buttons?\n\nAddresses you already entered for the standard buttons are kept. Buttons you added yourself are removed.')) return;
+  readLinksForm();
+  const old = {};
+  linksDraft.items.forEach(it => { old[it.id] = it; it.children.forEach(c => { old[c.id] = c; }); });
+  const keep = d => { const n = linkNode(d); if (old[d.id]) { n.url = old[d.id].url || ''; n.pinned = !!old[d.id].pinned; } n.children = (d.children || []).map(keep); return n; };
+  linksDraft.items = LINK_DEFAULTS.map(keep);
+  drawLinksEditor();
+  toast('Standard list restored — tap ✓ to save');
+}
+
+function saveLinksSettings() {
+  readLinksForm();
+  const D = linksDraft;
+  const bad = [];
+  const check = (it) => {
+    it.label = (it.label || '').trim() || 'Untitled';
+    it.url = (it.url || '').trim();
+    const p = linkUrlProblem(it.url);
+    if (p) bad.push('"' + it.label + '" link ' + p);
+  };
+  D.items.forEach(it => { check(it); it.children.forEach(check); });
+  const ap = linkUrlProblem(D.audit);
+  if (ap) bad.unshift('Audit Report link ' + ap);
+  // Highlight every bad field
+  document.querySelectorAll('#lk-list [data-f="url"], #lk-audit').forEach(inp => inp.classList.toggle('lk-bad', !!linkUrlProblem(inp.value)));
+  if (bad.length) { toast(bad[0] + (bad.length > 1 ? ' (+' + (bad.length - 1) + ' more)' : ''), 4000); return; }
+  APP.settings.links = D;
+  linksDraft = null;
+  saveData();
+  goBack();
+  toast('SharePoint shortcuts saved');
+}
+
+// ---------- Share / import ----------
+async function shareLinks() {
+  readLinksForm();
+  const strip = it => ({ icon: it.icon, label: it.label, url: linkUrlProblem(it.url) ? '' : it.url,
+                         children: (it.children || []).map(strip) });
+  const payload = { kind: 'fso-app-links', version: 1, exportedAt: new Date().toISOString(),
+                    audit: linkUrlProblem(linksDraft.audit) ? '' : linksDraft.audit,
+                    items: linksDraft.items.map(strip) };
+  const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 1));
+  const name = 'FSO-App-links.json';
+  try {
+    const file = new File([bytes], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'FSO App SharePoint links' });
+      return;
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  downloadBlob(bytes, name, 'application/json');
+  toast('Links file saved — send it to the other engineer');
+}
+
+function importLinks(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  if (file.size > 200000) { toast('That file is too large to be a links file'); return; }
+  const r = new FileReader();
+  r.onload = e => {
+    let data;
+    try { data = JSON.parse(e.target.result); } catch (err) { toast('Not a valid links file'); return; }
+    if (!data || data.kind !== 'fso-app-links' || !Array.isArray(data.items)) { toast('Not an FSO App links file'); return; }
+    let dropped = 0;
+    const clean = (n, depth) => {
+      n = n || {};
+      let url = String(n.url || '').trim().slice(0, 2000);
+      if (linkUrlProblem(url)) { url = ''; dropped++; }
+      const out = { id: newLinkId(), icon: shortIcon(n.icon), label: String(n.label || '').trim().slice(0, 60) || 'Untitled',
+                    url, pinned: false, children: [] };
+      if (depth === 0 && Array.isArray(n.children)) out.children = n.children.slice(0, 30).map(c => clean(c, 1));
+      return out;
+    };
+    const items = data.items.slice(0, 60).map(n => clean(n, 0));
+    let audit = String(data.audit || '').trim();
+    if (linkUrlProblem(audit)) { audit = ''; dropped++; }
+    if (!confirm('Load ' + items.length + ' button(s) from this file?\n\nThis replaces the list on this screen. Nothing is saved until you tap ✓. Your pins are kept where the button names match.')) return;
+    readLinksForm();
+    // Keep this engineer's pins for buttons with the same name
+    const pinned = new Set();
+    linksDraft.items.forEach(it => { if (it.pinned) pinned.add(it.label); it.children.forEach(c => { if (c.pinned) pinned.add(c.label); }); });
+    items.forEach(it => { it.pinned = pinned.has(it.label); it.children.forEach(c => { c.pinned = pinned.has(c.label); }); });
+    linksDraft = { audit: audit || linksDraft.audit, items };
+    drawLinksEditor();
+    toast('Imported — check the links, then tap ✓ to save' + (dropped ? ' · ' + dropped + ' non-https link(s) removed' : ''), 4000);
+  };
+  r.readAsText(file);
+}
+
+// ============================================================
+// HARDWARE BACK / SWIPE-BACK (v2.10.0)
+// The browser history behind the app can contain the Microsoft sign-in page
+// (MSAL loginRedirect), so the Android back button used to leave the app for
+// it. We keep one "guard" history entry on top; every back press lands on
+// popstate, we re-arm the guard and do an in-app back instead.
+// The guard is first pushed on a user tap: Chrome ignores history entries
+// created before the user has interacted with the page.
+// ============================================================
+let backGuardArmed = false;
+function armBackGuard() {
+  if (backGuardArmed) return;
+  try { history.pushState({ fsoGuard: true }, ''); backGuardArmed = true; } catch (e) {}
+}
+function initBackHandling() {
+  const arm = () => armBackGuard();
+  document.addEventListener('click', arm, true);
+  document.addEventListener('keydown', arm, true);
+  window.addEventListener('popstate', function () {
+    backGuardArmed = false;
+    armBackGuard();
+    try { handleHardwareBack(); } catch (e) { console.warn('back', e); }
+  });
+}
+function handleHardwareBack() {
+  // Close an open overlay first, using its own close routine
+  const overlays = [
+    ['date-overlay', typeof closeDatePicker === 'function' ? closeDatePicker : null],
+    ['material-overlay', typeof closeMaterialSearch === 'function' ? closeMaterialSearch : null],
+    ['history-overlay', typeof closeHistory === 'function' ? closeHistory : null],
+    ['preview-overlay', typeof closePreview === 'function' ? closePreview : null],
+    ['sig-overlay', typeof closeSig === 'function' ? closeSig : null]
+  ];
+  for (const [id, fn] of overlays) {
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('show')) { if (fn) fn(); else el.classList.remove('show'); return; }
+  }
+  const active = document.querySelector('.screen.active');
+  const id = active ? active.id : '';
+  if (!id || id === 'screen-pin') return;                 // locked: stay put
+  if (id === 'screen-home') { toast("You're on the home screen"); return; }
+  if (id === 'screen-error') { errorBackHome(); return; }
+  // Use the screen's own ← button, so screens that save on back still save
+  const btn = active.querySelector('.topbar .back-btn');
+  if (btn && btn.offsetParent !== null && getComputedStyle(btn).visibility !== 'hidden') { btn.click(); return; }
+  // No visible back button (e.g. first-run book setup) — stay on this screen
 }
 
 function openMaterialSearch(i) {
@@ -6313,6 +6848,12 @@ async function startup() {
       .catch(function(e){ console.warn('startup sync', e); });
   }).catch(function(e){console.warn(e);});
   window.addEventListener('online', function(){ if (odIsConnected()) odDrainQueue(); });
+  // SharePoint shortcuts grey out / come back as the connection drops and returns.
+  window.addEventListener('online', refreshNetUi);
+  window.addEventListener('offline', refreshNetUi);
+  linksCfg();
+  // Hardware back / swipe-back stays inside the app (never back to the Microsoft sign-in page).
+  initBackHandling();
 
   if (!APP.pin) {
     // First run — set a default PIN or skip to book setup

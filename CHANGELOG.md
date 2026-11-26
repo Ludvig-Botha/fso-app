@@ -1,5 +1,47 @@
 # Changelog
 
+## v2.10.0 — 2026-11-26
+- NEW: **SharePoint** button on the home screen. Opens a list of shortcuts to
+  company pages: RFP page, Engineering / Service / Energy action request,
+  Travel Request, Service Department documents, FSO's, Standby roster, SHEQ
+  documents, Timesheets, Finance Claims (sub-buttons: Export claims, Local
+  Claims, OTA claims) and Commissioning.
+- NEW: **Audit Report** button on the home screen, opening the audit app.
+- NEW: Settings → **SharePoint shortcuts**. Each engineer pastes their own URL
+  for every button and for the Audit Report app. Buttons can be renamed,
+  re-ordered, removed or added, and any button can have sub-links (a group
+  with an optional main-page link of its own). "Reset to the standard list"
+  restores the original 12 buttons and keeps the URLs already entered.
+- NEW: **Pinned quick-access row** on the home screen. Tap ☆ next to any link
+  (or tick "Pin to home" in Settings) to pin it; pinned sub-links are allowed.
+- NEW: **Share / Import links**. Share creates `FSO-App-links.json` (names,
+  icons and URLs only; no pins, no job data) via the phone's share sheet, or
+  downloads it on a PC. Import validates the file, removes any non-https link,
+  keeps your pins where names match, and only saves when you tap ✓.
+- Links are stored in `APP.settings.links`, so they are included in the
+  manual backup and in `backup-latest.json` automatically.
+- SECURITY: new `safeOpenUrl()` is the single gate for user-entered links.
+  Only `https://` URLs open; `http:`, `javascript:`, `data:`, malformed
+  addresses and URLs with embedded login details are refused on save AND at
+  the moment of opening (so a tampered backup or shared file can't slip one
+  through). The job-registration, OneDrive folder, job folder and material
+  links now go through the same gate.
+- Offline: the SharePoint and Audit cards, pinned chips and every link are
+  greyed out with an "Offline" notice, and tapping one explains that it needs
+  internet. They come back by themselves when the connection returns.
+- Links open in the browser (SharePoint refuses to be embedded inside another
+  site, so an in-app frame isn't possible). The app stays where it was
+  underneath, so closing the page / pressing back returns straight to it.
+- FIX (back button went to the login page): after a Microsoft sign-in redirect
+  the sign-in page sat behind the app in the browser history, so Android back
+  / iOS swipe-back left the app for it. The app now keeps a guard history
+  entry and turns every back press into an in-app back: it closes an open
+  overlay first (signature, preview, history, material search, date picker),
+  otherwise it presses the screen's own ← button (so screens that save on back
+  still save). On the home screen it stays put and shows "You're on the home
+  screen"; on the PIN screen it does nothing.
+- SW cache v28. Built on v2.9.4.
+
 ## v2.9.0 — 2026-07-26
 - FIX (rates did not change on External -> Internal): once a job's documents
   have been created, its rates are LOCKED so an exported FSO can never change

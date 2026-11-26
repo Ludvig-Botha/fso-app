@@ -24,6 +24,8 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
    design; anything else sensitive goes in Settings, entered per user).
 5. **The All sheet uses FORMULAS, not written values** — the workbook must stay
    self-consistent even if someone edits a sheet by hand in Excel.
+6. **User-entered links open ONLY through `safeOpenUrl()`** (https only, no embedded
+   login details, checked at open time). Never call `window.open(userValue)` directly.
 
 ## Two-number system
 
@@ -63,6 +65,36 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
   `odWriteAllRow`). Never pre-write formula rows.
 - Old macro workbook (`47700C47750C_..._Macros.xlsm`) is retired — kept only as an example.
 
+## SharePoint shortcuts (v2.10.0)
+
+- Home → **SharePoint** card → `screen-sp-links` (list) → groups open `screen-sp-group`
+  (`ctx.linkId`). Home → **Audit Report** card → `openAuditApp()`.
+- Data: `APP.settings.links = { audit, items:[{id, icon, label, url, pinned, children:[…]}] }`,
+  created from `LINK_DEFAULTS` by `linksCfg()`. One level of children only. Part of `APP`, so
+  it is in every backup automatically. Each engineer enters their own URLs (by design, for now).
+- Editor: Settings → SharePoint shortcuts (`screen-settings-links`). Edits a deep-copied
+  `linksDraft`; `readLinksForm()` syncs inputs before any add/move/delete; ← / ✓ run
+  `saveLinksSettings()`, which refuses to save while any URL fails `linkUrlProblem()`.
+- Pins: `pinned` on any item or child → chips in `#home-pins` (`renderHomeLinks()`, called
+  from `renderHome()`).
+- Share/import: `shareLinks()` → `FSO-App-links.json` `{kind:'fso-app-links', version:1,
+  audit, items}` (no pins). `importLinks()` caps sizes, regenerates ids, blanks non-https
+  URLs, keeps pins by label, loads into the draft only (user must tap ✓).
+- Offline: `refreshNetUi()` on `online`/`offline` events; `.link-off` greys items.
+- Links open with `window.open(url,'_blank','noopener')`. SharePoint sends frame-ancestors
+  restrictions, so an in-app iframe is NOT possible — don't try.
+
+## Back button handling (v2.10.0)
+
+- Problem: MSAL `loginRedirect` (standalone PWA) leaves login.microsoftonline.com in the
+  history behind the app, so Android back left the app for the sign-in page.
+- `initBackHandling()` keeps one guard history entry on top (`armBackGuard`, first pushed on a
+  user click/keydown because Chrome skips entries added before any user activation).
+  `popstate` → re-arm → `handleHardwareBack()`: closes an open overlay via its own close
+  function, else clicks the active screen's visible `.topbar .back-btn` (so save-on-back
+  screens still save). Home: toast only. PIN: nothing. Error screen: `errorBackHome()`.
+- New overlays must be added to the list in `handleHardwareBack()`.
+
 ## Azure / Graph
 
 - MSAL SPA + PKCE, no client secret. Redirect URI = exact GitHub Pages URL, platform "SPA".
@@ -95,3 +127,5 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 - Timesheet push into an Excel sheet via Graph (current: local xlsx download generator).
 - Risk Assessment attachment (Phase 3 checkbox is disabled in the UI).
 - At-rest encryption of localStorage (discussed, deferred — migration complexity).
+- Shared/central SharePoint link list pushed to all engineers (currently each engineer
+  enters their own; share/import file covers handing links on).
