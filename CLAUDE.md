@@ -166,6 +166,14 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 - `editCustomerFromFso()` carries `fsoId/bookId` into the customer screen's ctx (goTo replaces
   ctx — anything that must survive a round-trip has to be passed along).
 
+## Status colours (v2.13.1)
+
+- `statusKey(fso)` → active (open/progress, yellow) · signed (orange) · sent without customer
+  signature (red) · sentsigned (purple) · done/complete (green); CSS `.st .st-<key>`, total = white.
+  Use `statusChipFor(fso)` / `statusDot(fso)` — not `statusChip(status)` — wherever an FSO is shown.
+- Home version banner: `renderHomeVersion()` (silent live-version check every 10 min) /
+  `homeVersionAction()`.
+
 ## Azure / Graph
 
 - MSAL SPA + PKCE, no client secret. Redirect URI = exact GitHub Pages URL, platform "SPA".

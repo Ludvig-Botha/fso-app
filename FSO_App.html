@@ -170,6 +170,18 @@ body.dark .pin-chip{background:#1b2536;color:#e8edf4}
 .stat-num{font-size:1.4rem;font-weight:700;font-family:"DM Mono",monospace}
 .stat-label{font-size:.7rem;color:var(--grey);margin-top:2px}
 /* Sync badge */
+.st{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:3px 9px;border-radius:20px;font-size:.78rem;font-weight:700;border:1.5px solid transparent}
+.st-active{background:#fef9c3;color:#a16207;border-color:#facc15}
+.st-signed{background:#ffedd5;color:#c2410c;border-color:#fb923c}
+.st-sent{background:#fee2e2;color:#b91c1c;border-color:#f87171}
+.st-sentsigned{background:#ede9fe;color:#6d28d9;border-color:#a78bfa}
+.st-done{background:#dcfce7;color:#15803d;border-color:#4ade80}
+.st-total{background:#fff;color:#111827;border-color:#d1d5db}
+body.dark .st-total{background:#f8fafc;color:#0f172a}
+.home-counts{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.ver-badge{justify-content:space-between}
+.ver-badge.old{background:var(--orange-light);color:var(--orange)}
+.ver-badge.off{background:var(--grey-light);color:var(--grey)}
 .sync-badge{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;font-size:.8rem;font-weight:500;background:var(--green-light);color:var(--green);margin-bottom:16px}
 /* Day row card */
 .day-card{background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden}
@@ -384,10 +396,11 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <button class="icon-btn" onclick="goTo('screen-settings')" title="Settings">⚙️</button>
   </div>
   <div class="body">
-    <div id="home-sync-badge" class="sync-badge">
-      <span id="home-sync-dot">🟢</span>
-      <span id="home-sync-text">All data saved locally</span>
+    <div id="home-ver" class="sync-badge ver-badge">
+      <span id="home-ver-text">v—</span>
+      <button class="btn btn-secondary btn-sm" id="home-ver-btn" style="width:auto;height:30px;font-size:.75rem;padding:0 10px" onclick="homeVersionAction()">Check for updates</button>
     </div>
+    <button class="btn btn-primary" onclick="createNewFso()" style="margin-bottom:14px">+ New FSO</button>
     <!-- Book badge -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div>
@@ -396,48 +409,16 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <button class="btn btn-secondary btn-sm" onclick="goTo('screen-books')">Switch Book</button>
     </div>
-    <!-- Stats -->
-    <div class="stats-row" id="home-stats">
-      <div class="stat-card">
-        <div class="stat-num" id="stat-total">0</div>
-        <div class="stat-label">Total</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="stat-open" style="color:var(--red)">0</div>
-        <div class="stat-label">Open</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="stat-inprog" style="color:var(--purple)">0</div>
-        <div class="stat-label">Active</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-num" id="stat-done" style="color:var(--green)">0</div>
-        <div class="stat-label">Done</div>
-      </div>
-    </div>
     <!-- Pinned SharePoint shortcuts (quick-access row) -->
     <div id="home-pins"></div>
     <!-- Nav cards -->
     <div class="nav-grid">
-      <div class="nav-card" onclick="goTo('screen-active')">
-        <div class="nav-icon">📋</div>
-        <div class="nav-title">Active FSOs</div>
-        <div class="nav-sub">Open & in progress</div>
-      </div>
-      <div class="nav-card" onclick="goTo('screen-archive')">
-        <div class="nav-icon">📁</div>
-        <div class="nav-title">Archive</div>
-        <div class="nav-sub">Signed & completed</div>
-      </div>
-      <div class="nav-card" onclick="goTo('screen-notes')">
-        <div class="nav-icon">📝</div>
-        <div class="nav-title">Notes</div>
-        <div class="nav-sub">Reminders & to-dos</div>
-      </div>
-      <div class="nav-card" onclick="showTimesheetPlaceholder()">
-        <div class="nav-icon">📊</div>
-        <div class="nav-title">Timesheets</div>
-        <div class="nav-sub">Monthly, from day cards</div>
+      <div class="nav-card" style="grid-column:1/-1" onclick="goTo('screen-active')">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="nav-icon" style="margin:0">📋</div>
+          <div class="nav-title">Active FSOs</div>
+        </div>
+        <div class="home-counts" id="home-counts"></div>
       </div>
       <div class="nav-card" id="home-card-sp" onclick="goTo('screen-sp-links')">
         <div class="nav-icon">🔗</div>
@@ -454,10 +435,22 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <div class="nav-title">Settings</div>
         <div class="nav-sub">Profile & rates</div>
       </div>
+      <div class="nav-card" onclick="goTo('screen-archive')">
+        <div class="nav-icon">📁</div>
+        <div class="nav-title">Archive</div>
+        <div class="nav-sub">Sent & completed</div>
+      </div>
+      <div class="nav-card" onclick="goTo('screen-notes')">
+        <div class="nav-icon">📝</div>
+        <div class="nav-title">Notes</div>
+        <div class="nav-sub">Reminders & to-dos</div>
+      </div>
+      <div class="nav-card" onclick="showTimesheetPlaceholder()">
+        <div class="nav-icon">📊</div>
+        <div class="nav-title">Timesheets</div>
+        <div class="nav-sub">Monthly, from day cards</div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="createNewFso()" style="margin-top:4px">
-      + New FSO
-    </button>
   </div>
 </div>
 
@@ -1561,7 +1554,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.13.1';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2132,6 +2125,23 @@ const STATUS_CHIP = {
 const STATUS_ACTIVE = ['open','progress','signed'];
 const STATUS_ARCHIVE = ['sent','complete'];
 
+// v2.13.1 status colours: in progress yellow · signed (not shared) orange · sent (not signed) red ·
+// signed & sent (not completed) purple · completed green
+function statusKey(f) {
+  const st = f.status;
+  if (st === 'complete') return 'done';
+  if (st === 'sent') return (f.signatures && f.signatures.customer) ? 'sentsigned' : 'sent';
+  if (st === 'signed') return 'signed';
+  if (st === 'open' || st === 'progress') return 'active';
+  return 'total';
+}
+const STATUS_KEY_LABEL = { active: null, signed: 'Signed', sent: 'Sent', sentsigned: 'Signed & sent', done: 'Completed' };
+function statusChipFor(f) {
+  const k = statusKey(f);
+  const lbl = STATUS_KEY_LABEL[k] || (STATUS_CHIP[f.status] ? STATUS_CHIP[f.status][1] : f.status);
+  return '<span class="st st-' + k + '" style="font-weight:600">' + esc(lbl) + '</span>';
+}
+function statusDot(f) { return { active: '🟡', signed: '🟠', sent: '🔴', sentsigned: '🟣', done: '🟢' }[statusKey(f)] || '⚪'; }
 function statusChip(status) {
   const [cls, lbl] = STATUS_CHIP[status] || ['chip-grey', status];
   return '<span class="chip ' + cls + '">' + lbl + '</span>';
@@ -2146,16 +2156,17 @@ function statusIcon(status) {
 // ============================================================
 function renderHome() {
   try { renderHomeLinks(); } catch (e) { console.warn('home links', e); }
+  try { renderHomeVersion(); } catch (e) {}
   const book = activeBook();
   document.getElementById('home-book-badge').textContent = book
     ? book.config.fsoRangeStart + ' – ' + book.config.fsoRangeEnd : '—';
   if (!book) return;
-  const fsos = allFsos();
-  // "Total" = registered FSOs (anything that has left the Available pool)
-  document.getElementById('stat-total').textContent = fsos.filter(f => f.status !== 'available').length;
-  document.getElementById('stat-open').textContent  = fsos.filter(f => f.status === 'open').length;
-  document.getElementById('stat-inprog').textContent = fsos.filter(f => f.status === 'progress').length;
-  document.getElementById('stat-done').textContent  = fsos.filter(f => f.status === 'complete' || f.status === 'sent').length;
+  const used = allFsos().filter(f => f.status !== 'available');
+  const n = k => used.filter(f => statusKey(f) === k).length;
+  document.getElementById('home-counts').innerHTML =
+    [['total', used.length, 'Total'], ['active', n('active'), 'In progress'], ['signed', n('signed'), 'Signed, not shared'],
+     ['sent', n('sent'), 'Sent, not signed'], ['sentsigned', n('sentsigned'), 'Signed & sent, not completed'], ['done', n('done'), 'Completed']]
+      .map(([k, v, t]) => '<span class="st st-' + k + '" title="' + t + '">' + v + '</span>').join('');
 }
 
 // ============================================================
@@ -2289,14 +2300,14 @@ function fsoListItem(f) {
   if (lbl) bits.push(esc(lbl));
   const sub = (f.header.description || '').trim() || 'No job description';
   return '<div class="list-item" onclick="openFso(&#39;' + esc(f.fsoNumber) + '&#39;,&#39;' + f.bookId + '&#39;)">' +
-    '<div class="icon-circle" style="background:var(--grey-light);font-size:1rem">' + statusIcon(f.status) + '</div>' +
+    '<div class="icon-circle" style="background:var(--grey-light);font-size:1rem">' + statusDot(f) + '</div>' +
     '<div class="list-item-main">' +
       '<div class="list-item-title">' + bits.join(' · ') + '</div>' +
       '<div class="list-item-sub">' + esc(sub) + ' · ' + days + ' day' + (days===1?'':'s') + '</div>' +
     '</div>' +
     '<div class="list-item-right">' +
       (f.exportState === 'queued' ? '<div style="font-size:.6rem;font-weight:700;color:#92400e;background:var(--orange-light);padding:2px 6px;border-radius:8px;margin-bottom:4px">READY TO SEND</div>' : '') +
-      statusChip(f.status) +
+      statusChipFor(f) +
       '<div style="font-size:.8rem;color:var(--grey);margin-top:4px">' + fmtFso(f, t.total) + '</div>' +
     '</div>' +
   '</div>';
@@ -2315,7 +2326,7 @@ function renderFsoEdit() {
   const book = APP.books[fso.bookId];
   const rates = fsoRates(fso);
   document.getElementById('fso-edit-title').textContent = fso.fsoNumber;
-  document.getElementById('fso-status-chip').innerHTML = statusChip(fso.status);
+  document.getElementById('fso-status-chip').innerHTML = statusChipFor(fso);
 
   const t = calcTotals(fso);
   const isArchived = STATUS_ARCHIVE.includes(fso.status);
@@ -2327,9 +2338,9 @@ function renderFsoEdit() {
   ['open','progress','signed','sent','complete'].forEach(s => {
     const active = fso.status === s;
     const [cls, lbl] = STATUS_CHIP[s];
-    html += '<button onclick="setFsoStatus(&#39;' + s + '&#39;)" style="padding:6px 12px;border-radius:20px;border:1.5px solid ' +
-      (active ? 'transparent' : 'var(--border)') + ';font-size:.8rem;font-weight:600;cursor:pointer;background:' +
-      (active ? 'var(--blue)' : '#fff') + ';color:' + (active ? '#fff' : 'var(--grey)') + '">' + lbl + '</button>';
+    const k = statusKey(Object.assign({}, fso, { status: s }));
+    html += '<button onclick="setFsoStatus(&#39;' + s + '&#39;)" class="' + (active ? 'st st-' + k : '') + '" style="padding:6px 12px;border-radius:20px;font-size:.8rem;font-weight:600;cursor:pointer;' +
+      (active ? '' : 'border:1.5px solid var(--border);background:#fff;color:var(--grey)') + '">' + lbl + '</button>';
   });
   html += '<button onclick="openHistory()" title="Revision history" style="margin-left:auto;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);font-size:.8rem;font-weight:600;cursor:pointer;background:#fff;color:var(--grey)">🕘 History (' + (fso.history || []).length + ')</button>';
   html += '</div>';
@@ -7965,6 +7976,36 @@ async function checkForUpdates(silent) {
     console.warn('update check', e);
     if (!silent) toast('Update check failed: ' + (e.message || e));
   }
+}
+
+// ---- Home version banner (v2.13.1) ----------------------------------------
+let homeVer = { live: null, at: 0, busy: false };
+async function fetchLiveVersion() {
+  const res = await fetch('FSO_App.html?_=' + Date.now(), { cache: 'no-store' });
+  const m = /const APP_VERSION = '([^']+)'/.exec(await res.text());
+  return m ? m[1] : null;
+}
+function renderHomeVersion() {
+  const box = document.getElementById('home-ver'), txt = document.getElementById('home-ver-text'), btn = document.getElementById('home-ver-btn');
+  if (!box) return;
+  const waiting = !!(swReg && swReg.waiting);
+  const newer = waiting || (homeVer.live && homeVer.live !== APP_VERSION);
+  box.className = 'sync-badge ver-badge' + (newer ? ' old' : (!isOnline() && !homeVer.live ? ' off' : ''));
+  if (newer) { txt.textContent = '● v' + APP_VERSION + ' · update available' + (homeVer.live && homeVer.live !== APP_VERSION ? ' (v' + homeVer.live + ')' : ''); btn.textContent = 'Update now'; }
+  else if (homeVer.live) { txt.textContent = '✓ v' + APP_VERSION + ' · up to date'; btn.textContent = 'Check for updates'; }
+  else { txt.textContent = 'v' + APP_VERSION + (isOnline() ? ' · checking…' : ' · offline'); btn.textContent = 'Check for updates'; }
+  if (isOnline() && !homeVer.busy && Date.now() - homeVer.at > 10 * 60 * 1000) {
+    homeVer.busy = true;
+    fetchLiveVersion().then(v => { homeVer.live = v; homeVer.at = Date.now(); })
+      .catch(() => {}).finally(() => { homeVer.busy = false; if (ctx.screen === 'screen-home') renderHomeVersion(); });
+  }
+}
+async function homeVersionAction() {
+  if ((swReg && swReg.waiting) || (homeVer.live && homeVer.live !== APP_VERSION)) { await applyUpdateNow(); return; }
+  homeVer.at = 0;
+  await checkForUpdates();
+  try { homeVer.live = await fetchLiveVersion(); homeVer.at = Date.now(); } catch (e) {}
+  renderHomeVersion();
 }
 
 // Force the new build in: drop the caches, retire the old worker, reload.

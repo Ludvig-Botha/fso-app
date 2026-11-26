@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.13.1 — 2026-11-27
+- Home screen rearranged: version banner at the top ("✓ v2.13.1 · up to date",
+  or "update available" with an Update now button; "Check for updates" on the
+  right), then **+ New FSO**, the active book, pinned links, a full-width
+  **Active FSOs** card, SharePoint / Audit Report / Settings, and Archive /
+  Notes / Timesheets at the bottom.
+- The Total / Open / Active / Done boxes are gone; the Active FSOs card shows
+  coloured counters instead: Total (white), In progress (yellow), Signed not
+  shared (orange), Sent not signed (red), Signed & sent not completed (purple),
+  Completed (green).
+- The same colours are used for the status chips and dots in the FSO lists and
+  on the FSO page, and for the selected status button.
+- SW cache v33.
+
 ## v2.13.0 — 2026-11-27
 - **Office location fixed.** The office is now pre-set to John Thompson, Sacks
   Circle, Bellville South (33°55'44.1"S 18°38'30.8"E = -33.928917, 18.641889),
