@@ -492,6 +492,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <button class="filter-pill" data-filter="open" onclick="setActiveFilter('open')">Open</button>
     <button class="filter-pill" data-filter="progress" onclick="setActiveFilter('progress')">In Progress</button>
     <button class="filter-pill" data-filter="signed" onclick="setActiveFilter('signed')">Signed</button>
+    <button class="filter-pill" data-filter="sent" onclick="setActiveFilter('sent')">Sent</button>
+    <button class="filter-pill" data-filter="complete" onclick="setActiveFilter('complete')">Completed</button>
   </div>
   <div class="body-no-pad" id="active-list">
     <!-- Rendered by renderActive() -->
@@ -547,7 +549,8 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <label>Customer</label>
       <div style="display:flex;gap:6px">
         <select class="form-control" id="hf-customer-select" onchange="onCustomerPick(this.value)"></select>
-        <button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 14px" onclick="addCustomerFromFso()">+</button>
+        <button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 12px" title="Edit this customer" onclick="editCustomerFromFso()">✎</button>
+        <button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 14px" title="New customer" onclick="addCustomerFromFso()">+</button>
       </div>
       <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:auto;font-size:.78rem" onclick="openFsoCustomerInMaps()">🗺 Find customer on Google Maps ↗</button>
     </div>
@@ -706,7 +709,11 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     </div>
     <div class="form-group">
       <label>Work Done / Nature of Service</label>
-      <textarea class="form-control" id="df-work" rows="3" placeholder="Describe the work carried out…"></textarea>
+      <textarea class="form-control" id="df-work" rows="2" placeholder="Short description for this day's line (hours & km row)"></textarea>
+    </div>
+    <div class="form-group">
+      <label>More detail about this day's work <span style="font-weight:400;color:var(--grey)">— printed in the comments with the date</span></label>
+      <textarea class="form-control" id="df-details" rows="4" placeholder="Longer description of what was done, found, adjusted, recommended…"></textarea>
     </div>
     <div class="card" style="margin-bottom:12px">
       <div class="card-title" style="margin-bottom:10px">Skilled Hours</div>
@@ -1012,6 +1019,15 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       Every exported FSO PDF is emailed to this address automatically, so you always
       have your own copy. Leave blank to switch it off.
     </p>
+    <div class="card" style="margin-top:14px">
+      <div class="card-title" style="margin-bottom:8px">My signature</div>
+      <div id="sp-sig-box" style="min-height:70px;border:1.5px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:8px;background:#fff"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="openSig('profile')">✍ Sign once</button>
+        <button class="btn btn-secondary btn-sm" id="sp-sig-clear" style="flex:1;color:var(--red)" onclick="clearProfileSig()">Remove</button>
+      </div>
+      <p style="font-size:.74rem;color:var(--grey);margin-top:8px;line-height:1.5">Added as the engineer signature to every FSO you print from now on (unless that FSO has its own engineer signature). Kept on this device and in your backups.</p>
+    </div>
   </div>
 </div>
 
@@ -1152,6 +1168,12 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <div class="card-header"><div class="card-title">Office GPS</div></div>
       <div id="office-gps-label" style="font-size:.85rem;color:var(--grey);margin-bottom:10px">Not set</div>
       <button class="btn btn-secondary" onclick="captureOfficeGps()">📍 Use current location</button>
+      <div class="form-group" style="margin:12px 0 8px"><label>Or type / paste the office coordinates</label>
+        <input class="form-control mono" id="office-coords" placeholder="-33.928917, 18.641889  or  33°55'44.1&quot;S 18°38'30.8&quot;E"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="setOfficeCoords()">Save coordinates</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="resetOfficeCoords()">JT Bellville office</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1539,7 +1561,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.12.0';
+const APP_VERSION = '2.13.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2196,7 +2218,8 @@ function toggleBookActive(bookId) {
 // ============================================================
 function renderActive() {
   const q = (document.getElementById('active-search').value || '').toLowerCase();
-  let fsos = allFsos().filter(f => STATUS_ACTIVE.includes(f.status));
+  // v2.13.0: All = every FSO used in this work book (any status), A–Z
+  let fsos = allFsos().filter(f => f.status !== 'available');
   if (activeFilter !== 'all') fsos = fsos.filter(f => f.status === activeFilter);
   if (q) fsos = fsos.filter(f =>
     f.fsoNumber.toLowerCase().includes(q) ||
@@ -2206,16 +2229,11 @@ function renderActive() {
     (f.header.description || '').toLowerCase().includes(q) ||
     (f.header.addressSite || '').toLowerCase().includes(q)
   );
-  // Sort: progress first, then open, then by fso number
-  fsos.sort((a,b) => {
-    const so = {progress:0,signed:1,open:2};
-    const diff = (so[a.status]||3) - (so[b.status]||3);
-    if (diff !== 0) return diff;
-    return a.fsoNumber.localeCompare(b.fsoNumber);
-  });
+  // In FSO number order: 47700, 47701, 47702 …
+  fsos.sort((a,b) => a.fsoNumber.localeCompare(b.fsoNumber, undefined, { numeric: true }));
   const el = document.getElementById('active-list');
   if (!fsos.length) {
-    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No active FSOs' + (q ? ' matching "' + esc(q) + '"' : '') + '</p></div>' +
+    el.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No ' + (activeFilter === 'all' ? '' : (STATUS_CHIP[activeFilter] ? STATUS_CHIP[activeFilter][1] + ' ' : '')) + 'FSOs' + (q ? ' matching "' + esc(q) + '"' : '') + '</p></div>' +
       '<div style="padding:0 16px"><button class="btn btn-primary" onclick="createNewFso()">+ New FSO</button></div>';
     return;
   }
@@ -2400,6 +2418,7 @@ function renderFsoEdit() {
       // Day body (collapsed by default)
       html += '<div class="day-card-body" id="day-body-' + i + '" style="display:none">';
       html += '<div style="margin:8px 0 6px;font-size:.78rem;font-weight:600;color:var(--grey)">SKILLED HOURS</div>';
+      if (d.details) html += '<div style="margin:6px 0 8px;font-size:.8rem;color:#374151;white-space:pre-wrap">' + esc(d.details) + '</div>';
       html += '<div class="hours-grid">';
       html += '<div class="hours-cell"><div class="hc-label">Normal Time</div><div class="hc-val">' + (parseFloat(d.ntHours)||0) + '</div></div>';
       html += '<div class="hours-cell"><div class="hc-label">OT 1.5×</div><div class="hc-val">' + (parseFloat(d.ot15Hours)||0) + '</div></div>';
@@ -2443,7 +2462,11 @@ function renderFsoEdit() {
       const kb = a.sizeKb ? a.sizeKb + ' KB' : '';
       html += '<div class="att-item">';
       html += '<div class="att-icon">' + icon + '</div>';
-      html += '<div style="flex:1;min-width:0"><div class="att-name">' + esc(a.name) + '</div><div class="att-size">' + kb + '</div></div>';
+      html += '<div style="flex:1;min-width:0"><div class="att-name">' + esc(a.name) + '</div><div class="att-size">' + kb +
+        (a.receipt ? ' · receipt (admin only, never printed)' : '') + '</div>' +
+        (!a.receipt && attKind(a) && !isArchived ? '<label style="display:flex;align-items:center;gap:6px;font-size:.74rem;color:var(--grey);margin-top:4px"><input type="checkbox"' + (attPrints(a) ? ' checked' : '') +
+          ' onchange="toggleAttPrint(&#39;' + a.id + '&#39;,this.checked)"> Print with PDF</label>' : '') +
+        (!a.receipt && !attKind(a) ? '<div style="font-size:.7rem;color:var(--grey);margin-top:2px">Can\'t be printed into the PDF — emailed as a separate file</div>' : '') + '</div>';
       if (!isArchived) html += '<button class="att-del" onclick="deleteAttachment(&#39;' + a.id + '&#39;)">✕</button>';
       html += '</div>';
     });
@@ -2483,10 +2506,13 @@ function renderFsoEdit() {
   html += '<div class="sig-box" onclick="' + (isArchived ? '' : 'openSig(\'engineer\')') + '">';
   if (fso.signatures.engineer) {
     html += '<img src="data:image/png;base64,' + fso.signatures.engineer + '" alt="Engineer sig">';
+  } else if (APP.settings.engineerSignature) {
+    html += '<img src="data:image/png;base64,' + APP.settings.engineerSignature + '" alt="Saved signature" style="opacity:.55">';
   } else {
     html += '<span>' + (isArchived ? 'Not signed' : 'Tap to sign') + '</span>';
   }
   html += '</div>';
+  if (!fso.signatures.engineer && APP.settings.engineerSignature) html += '<div style="font-size:.7rem;color:var(--grey);margin-top:4px;text-align:center">Your saved signature is used</div>';
   if (fso.signatures.engineer && !isArchived) html += sigDeleteBtn('engineer');
   html += '</div>';
   // Customer
@@ -2644,9 +2670,21 @@ function goToExport() {
 }
 
 function deleteFso() {
-  if (!confirm('Delete FSO ' + ctx.fsoId + '? This cannot be undone.')) return;
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
+  const hadDocs = !!(fso.docsBuiltAt || fso.jobCreatedAt || fso.pdfLast);
+  if (!confirm('Delete FSO ' + ctx.fsoId + '? This cannot be undone in the app.' +
+      (hadDocs ? '\n\nIts OneDrive job folder is moved to "' + DELETED_FOLDER + '" in this work book\'s folder for safe keeping.' : ''))) return;
+  if (hadDocs) {
+    const book = APP.books[ctx.bookId], title = fsoDocTitle(fso);
+    const queue = () => { odQueuePush({ type: 'moveDeleted', bookId: book.id, title }); toast('The OneDrive folder will be moved to ' + DELETED_FOLDER + ' when online'); };
+    if (odIsConnected() && isOnline()) {
+      odMoveToDeleted(book, title)
+        .then(ok => toast(ok ? 'OneDrive folder moved to ' + DELETED_FOLDER : 'No OneDrive folder found for this FSO'))
+        .catch(e => { console.warn('move deleted', e); queue(); });
+    } else queue();
+  }
+  try { idbDel(pdfCacheKey(fso)); } catch (e) {}
   // Free the attachment bytes in IndexedDB (skip any id still referenced by another FSO/revision)
   const otherIds = new Set();
   Object.values(APP.books).forEach(b => Object.values(b.fsos).forEach(f => {
@@ -3012,6 +3050,7 @@ function renderDayForm() {
   document.getElementById('df-date').value = day.date || '';
   document.getElementById('df-km').value = day.km || '';
   document.getElementById('df-work').value = day.workDone || '';
+  document.getElementById('df-details').value = day.details || '';
   document.getElementById('df-nt').value = day.ntHours || '';
   document.getElementById('df-ot15').value = day.ot15Hours || '';
   document.getElementById('df-ot20').value = day.ot20Hours || '';
@@ -3108,6 +3147,7 @@ function saveDayForm() {
     date:         document.getElementById('df-date').value,
     km:           parseFloat(document.getElementById('df-km').value) || 0,
     workDone:     document.getElementById('df-work').value.trim(),
+    details:      document.getElementById('df-details').value.trim(),
     ntHours:      parseFloat(document.getElementById('df-nt').value) || 0,
     ot15Hours:    parseFloat(document.getElementById('df-ot15').value) || 0,
     ot20Hours:    parseFloat(document.getElementById('df-ot20').value) || 0,
@@ -3165,7 +3205,8 @@ async function handleAttachments(event) {
       fso.attachments.push({
         id, name, type: 'file', mimeType: mime,
         sizeKb: Math.round(bytes / 1024),
-        addedDate: todayStr(), includeInExport: true, stored: 'idb'
+        addedDate: todayStr(), includeInExport: true, stored: 'idb',
+        printWithPdf: /pdf/i.test(mime) || /\.pdf$/i.test(name)
       });
       addHistory(fso, 'Attachment added: ' + name);
       added++;
@@ -3194,9 +3235,9 @@ function deleteAttachment(attId) {
 // SIGNATURE
 // ============================================================
 function openSig(mode) {
-  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const fso = mode === 'profile' ? { signatures: {}, header: {} } : getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
-  document.getElementById('sig-label').textContent = mode === 'engineer' ? 'Engineer Signature' : 'Customer Signature';
+  document.getElementById('sig-label').textContent = mode === 'customer' ? 'Customer Signature' : (mode === 'profile' ? 'My signature — used on every FSO' : 'Engineer Signature');
   document.getElementById('sig-name-wrap').style.display = mode === 'customer' ? 'block' : 'none';
   document.getElementById('sig-customer-name').value = fso.signatures.customerName || '';
   // Contact dropdown: quick-pick who is signing, from the customer's imported contacts.
@@ -3399,6 +3440,14 @@ function confirmSig() {
   if (!sigHasStrokes) { toast('Please sign before confirming'); return; }
   const canvas = document.getElementById('sig-canvas');
   const b64 = processSignature(canvas);
+  if (ctx.sigMode === 'profile') {
+    APP.settings.engineerSignature = b64;
+    saveData();
+    closeSig();
+    renderSettingsProfile();
+    toast('Signature saved — it will be added to every FSO you print');
+    return;
+  }
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
   if (ctx.sigMode === 'engineer') {
@@ -3562,7 +3611,7 @@ function validateFsoForExport(fso) {
   if (isQuote(fso)) {
     const issues = [];
     if (!fso.signatures.customer) issues.push('No customer signature');
-    if (!fso.signatures.engineer) issues.push('No engineer signature');
+    if (!engineerSigFor(fso)) issues.push('No engineer signature');
     if (!(parseFloat(fso.quote && fso.quote.amountExVat) > 0)) issues.push('No quoted amount entered');
     if (!(fso.quote && fso.quote.number)) issues.push('No quotation number entered');
     return issues;
@@ -3574,7 +3623,7 @@ function validateCalloutForExport(fso) {
   const issues = [];
   const t = calcTotals(fso);
   if (!fso.signatures.customer) issues.push('No CUSTOMER signature');
-  if (!fso.signatures.engineer) issues.push('No engineer signature');
+  if (!engineerSigFor(fso)) issues.push('No engineer signature');
   if (!fso.header.customerPONo && fso.header.jobType !== 'INTERNAL') issues.push('Customer PO number is blank');
   if (!(fso.days || []).length) issues.push('No day entries captured');
   const hrs = (fso.days || []).reduce((s, d) => s + (parseFloat(d.ntHours)||0) + (parseFloat(d.ot15Hours)||0) + (parseFloat(d.ot20Hours)||0), 0);
@@ -3634,7 +3683,7 @@ async function doExport() {
   toast('Sending to workbook…');
   try {
     const webUrl = await odExportFso(fso);
-    fso.status = 'sent'; fso.exportedDate = todayStr(); fso.exportState = 'sent';
+    fso.exportedDate = todayStr(); fso.exportState = 'sent';   // v2.13.0: "Sent" only when emailed/shared
     addHistory(fso, 'Sent to workbook sheet ' + sheetNameFor(fso.fsoNumber));
     saveFsoData(fso);
 
@@ -3848,7 +3897,7 @@ async function generateXLSXFilled(fso) {
   });
   if (cur !== 'ZAR') { S('AM24', CURRENCIES[cur].sym + ' c'); S('R60', cur); }
   if (t.totalMaterials) N('AM40', t.totalMaterials);
-  if (h.description) S('A43', h.description);
+  commentLines(fso).forEach((ln, i) => { if (ln) S('A' + (42 + i), ln); });
 
   // Accommodation + signature name
   if (fsoHasAcc(fso) && parseFloat(fso.nights)) N('I68', parseFloat(fso.nights));
@@ -3916,7 +3965,7 @@ async function generateXLSXFilled(fso) {
   const drawXml = files['xl/drawings/drawing1.xml'] ? dec.decode(files['xl/drawings/drawing1.xml']) : '';
   const sigParts = [
     { media: 'xl/media/image3.png', anchor: 'sig_customer', b64: fso.signatures.customer },
-    { media: 'xl/media/image4.png', anchor: 'sig_engineer', b64: fso.signatures.engineer }
+    { media: 'xl/media/image4.png', anchor: 'sig_engineer', b64: engineerSigFor(fso) }
   ];
   for (const sp of sigParts) {
     if (!sp.b64) { files[sp.media] = u8(BLANK_SIG_PNG_B64); continue; }
@@ -4168,6 +4217,7 @@ async function sendToCompanySystem() {
         attachments: [att]
       }, saveToSentItems: true } });
     addHistory(fso, 'Sent to company system: to ' + sp.adminEmail + (ccList.length ? ' · cc ' + ccList.join(', ') : ' · no CC set'));
+
     logAction('company-system email sent to ' + sp.adminEmail + ' cc [' + ccList.join(', ') + ']');
     saveFsoData(fso); syncBook(fso.bookId);
     toast(ccList.length ? ('Sent to ' + sp.adminEmail + ', cc ' + ccList.length) : ('Sent to ' + sp.adminEmail + ' (no CC set)'));
@@ -4208,6 +4258,7 @@ function renderSettingsProfile() {
   document.getElementById('sp-name').value = book.config.engineerName || '';
   document.getElementById('sp-contact').value = book.config.engineerContact || '';
   document.getElementById('sp-email').value = APP.settings.engineerEmail || '';
+  renderProfileSig();
 }
 
 function saveProfile() {
@@ -4310,6 +4361,8 @@ function migrateData() {
   if (APP.settings.rates.external && APP.settings.rates.external.km === undefined) { APP.settings.rates.external.km = APP.settings.rates.kmRate || 0; }
   if (APP.settings.rates.internal && APP.settings.rates.internal.km === undefined) { APP.settings.rates.internal.km = APP.settings.rates.kmRate || 0; }
   if (!APP.settings.office.roadFactor) APP.settings.office.roadFactor = 1.3;
+  // v2.13.0: the office is the only reference point for travel — default it.
+  if (!APP.settings.office.gps || !isFinite(APP.settings.office.gps.lat)) APP.settings.office.gps = Object.assign({}, OFFICE_DEFAULT_GPS);
   if (APP.settings.materialLink === undefined) APP.settings.materialLink = '';
   if (!APP.settings.sharePoint) APP.settings.sharePoint = { registerUrl: '', uploadEnabled: false };
   if (APP.settings.sharePoint.oneDriveFolderUrl === undefined) APP.settings.sharePoint.oneDriveFolderUrl = '';
@@ -5017,6 +5070,243 @@ function openSpFolder() {
 }
 
 // ============================================================
+// v2.13.0 — office location, day details, saved engineer signature,
+// attachments in the PDF, "Signed" file names, Sent status, delete → OneDrive
+// ============================================================
+
+// ---- Coordinates ------------------------------------------------------------
+// John Thompson, Sacks Circle, Bellville South: 33°55'44.1"S 18°38'30.8"E
+const OFFICE_DEFAULT_GPS = { lat: -33.928917, lng: 18.641889 };
+// Accepts: -33.9289, 18.6418 · 33°55'44.1"S 18°38'30.8"E · 33.9289 S, 18.6418 E ·
+// Google Maps links (@lat,lng or !3dlat!4dlng)
+function parseCoords(raw) {
+  let s = String(raw || '');
+  try { s = decodeURIComponent(s); } catch (e) {}
+  s = s.replace(/[″”“]/g, '"').replace(/[′’‘]/g, "'").replace(/º/g, '°').trim();
+  let lat, lng, m;
+  if ((m = /(\d{1,3})\s*°\s*(\d{1,2})\s*'\s*([\d.]+)\s*"?\s*([NS])[\s,;]*(\d{1,3})\s*°\s*(\d{1,2})\s*'\s*([\d.]+)\s*"?\s*([EW])/i.exec(s))) {
+    lat = (+m[1] + m[2] / 60 + m[3] / 3600) * (/s/i.test(m[4]) ? -1 : 1);
+    lng = (+m[5] + m[6] / 60 + m[7] / 3600) * (/w/i.test(m[8]) ? -1 : 1);
+  } else if ((m = /(\d{1,2}(?:\.\d+)?)\s*°?\s*([NS])[\s,;]+(\d{1,3}(?:\.\d+)?)\s*°?\s*([EW])/i.exec(s))) {
+    lat = +m[1] * (/s/i.test(m[2]) ? -1 : 1);
+    lng = +m[3] * (/w/i.test(m[4]) ? -1 : 1);
+  } else if ((m = /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(s)) || (m = /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(s)) ||
+             (m = /(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})/.exec(s))) {
+    lat = +m[1]; lng = +m[2];
+  } else return null;
+  if (!(isFinite(lat) && isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) return null;
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+function setOfficeCoords() {
+  const inp = document.getElementById('office-coords');
+  const g = parseCoords(inp && inp.value);
+  if (!g) { toast('Could not read those coordinates — e.g. -33.928917, 18.641889 or 33°55\'44.1"S 18°38\'30.8"E'); return; }
+  APP.settings.office.gps = g;
+  saveData();
+  document.getElementById('office-gps-label').textContent = 'Set: ' + g.lat.toFixed(6) + ', ' + g.lng.toFixed(6);
+  inp.value = '';
+  toast('Office location saved');
+}
+function resetOfficeCoords() {
+  APP.settings.office.gps = Object.assign({}, OFFICE_DEFAULT_GPS);
+  saveData();
+  renderSettingsTravel();
+  toast('Office set to John Thompson, Bellville South');
+}
+
+// ---- Comments block (A42:A59): job description + dated day details ---------
+function wrapLine(text, n) {
+  const out = []; let line = '';
+  String(text || '').split(/\s+/).forEach(w => {
+    if (!w) return;
+    while (w.length > n) { if (line) { out.push(line); line = ''; } out.push(w.slice(0, n)); w = w.slice(n); }
+    if (!line) line = w;
+    else if ((line + ' ' + w).length <= n) line += ' ' + w;
+    else { out.push(line); line = w; }
+  });
+  if (line) out.push(line);
+  return out.length ? out : [''];
+}
+const COMMENT_ROWS = 18, COMMENT_CHARS = 115;
+function commentLines(fso) {
+  const out = [];
+  const desc = String(fso.header.description || '').replace(/\s+$/, '');
+  if (desc) desc.split(/\r?\n/).forEach(p => out.push(...wrapLine(p, COMMENT_CHARS)));
+  const days = (fso.days || []).filter(d => (d.details || '').trim());
+  if (days.length && out.length) out.push('');
+  days.forEach(d => {
+    String(d.details).trim().split(/\r?\n/).forEach((p, i) => {
+      const lead = i === 0 ? ((d.date ? ddmmyyyy(d.date) : 'No date') + ' – ') : '      ';
+      out.push(...wrapLine(lead + p, COMMENT_CHARS));
+    });
+  });
+  if (out.length > COMMENT_ROWS) { out.length = COMMENT_ROWS; out[COMMENT_ROWS - 1] = out[COMMENT_ROWS - 1].slice(0, COMMENT_CHARS - 2) + ' …'; }
+  return out;
+}
+
+// ---- Edit the customer picked on FSO Details -------------------------------
+function editCustomerFromFso() {
+  const id = document.getElementById('hf-customer-select').value;
+  if (!id) { toast('Pick a customer first'); return; }
+  saveHeaderForm(true);
+  // Carry the FSO along so "back" lands on this FSO's details again
+  goTo('screen-customer-edit', { custId: id, fsoId: ctx.fsoId, bookId: ctx.bookId });
+}
+
+// ---- Saved engineer signature ----------------------------------------------
+function engineerSigFor(fso) { return (fso.signatures && fso.signatures.engineer) || APP.settings.engineerSignature || ''; }
+function clearProfileSig() {
+  if (!APP.settings.engineerSignature) return;
+  if (!confirm('Remove your saved signature?\n\nFSOs that have their own engineer signature keep it; PDFs already printed are not changed.')) return;
+  APP.settings.engineerSignature = '';
+  saveData();
+  renderSettingsProfile();
+  toast('Saved signature removed');
+}
+function renderProfileSig() {
+  const box = document.getElementById('sp-sig-box');
+  if (!box) return;
+  const s = APP.settings.engineerSignature;
+  box.innerHTML = s ? '<img src="data:image/png;base64,' + s + '" alt="Saved signature" style="max-width:100%;max-height:90px">'
+                    : '<span style="color:var(--grey);font-size:.85rem">No signature saved</span>';
+  const clr = document.getElementById('sp-sig-clear');
+  if (clr) clr.style.display = s ? '' : 'none';
+}
+
+// ---- PDF file names: "<title> FSO[ Rev N][ Signed].pdf" -----------------------
+function pdfFileName(title, rev, signed) { return title + ' FSO' + (rev ? ' Rev ' + rev : '') + (signed ? ' Signed' : '') + '.pdf'; }
+function pdfRevOf(name, title) {
+  const b = title + ' FSO';
+  if (!name || name.indexOf(b) !== 0) return -1;
+  const m = /^(?: Rev (\d+))?(?: Signed)?\.pdf$/.exec(name.slice(b.length));
+  return m ? (m[1] ? +m[1] : 0) : -1;
+}
+async function odPdfNames(folderId) {
+  try {
+    const kids = await gFetch('GET', '/me/drive/items/' + folderId + '/children?$select=name&$top=200');
+    return (kids.value || []).map(k => k.name);
+  } catch (e) { console.warn('list job folder', e); return []; }
+}
+async function odNextPdfRev(folderId, title) {
+  const revs = (await odPdfNames(folderId)).map(n => pdfRevOf(n, title)).filter(r => r >= 0);
+  return revs.length ? Math.max.apply(null, revs) + 1 : 0;
+}
+async function odDeleteChild(folderId, name) {
+  try { await gFetch('DELETE', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(name).replace(/'/g, '%27'), { quiet: true }); return true; }
+  catch (e) { console.warn('delete', name, e); return false; }
+}
+
+// ---- Attachments merged into the PDF (photos + PDFs; receipts never) --------
+const PDFLIB_SRC = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+const PDFLIB_SRI = 'sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI';
+function loadPdfLib() {
+  if (window.PDFLib) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = PDFLIB_SRC; s.integrity = PDFLIB_SRI; s.crossOrigin = 'anonymous';
+    s.onload = () => res(); s.onerror = () => rej(new Error('Could not load the PDF library — check your connection'));
+    document.head.appendChild(s);
+  });
+}
+function attKind(a) {
+  const n = String(a.name || '').toLowerCase(), m = String(a.mimeType || '').toLowerCase();
+  if (m === 'application/pdf' || /\.pdf$/.test(n)) return 'pdf';
+  if (m === 'image/png' || /\.png$/.test(n)) return 'png';
+  if (/image\/jpe?g/.test(m) || /\.jpe?g$/.test(n)) return 'jpg';
+  return null;
+}
+// Only attachments ticked "Print with PDF" (PDFs default on, photos off), never receipts.
+function attPrints(a) { return !a.receipt && !!attKind(a) && (a.printWithPdf !== undefined ? !!a.printWithPdf : attKind(a) === 'pdf'); }
+function pdfMergeList(fso) { return (fso.attachments || []).filter(attPrints); }
+function toggleAttPrint(id, on) {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const a = fso && (fso.attachments || []).find(x => x.id === id);
+  if (!a || a.receipt) return;
+  a.printWithPdf = !!on;
+  addHistory(fso, 'Attachment "' + a.name + '" ' + (on ? 'will print with the PDF' : 'no longer prints with the PDF'));
+  saveFsoData(fso);
+  renderFsoEdit();
+}
+async function mergeAttachmentsIntoPdf(fso, fsoPdfBytes) {
+  const list = pdfMergeList(fso);
+  const res = { bytes: fsoPdfBytes, merged: [], skipped: [] };
+  if (!list.length) return res;
+  await loadPdfLib();
+  const { PDFDocument, StandardFonts, rgb } = PDFLib;
+  const doc = await PDFDocument.load(fsoPdfBytes);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (const a of list) {
+    const kind = attKind(a);
+    if (!kind) { res.skipped.push(a.name); continue; }
+    try {
+      const b64 = await attGetB64(a);
+      if (!b64) { res.skipped.push(a.name); continue; }
+      const u8 = u8FromB64(b64);
+      if (kind === 'pdf') {
+        const src = await PDFDocument.load(u8, { ignoreEncryption: true });
+        (await doc.copyPages(src, src.getPageIndices())).forEach(p => doc.addPage(p));
+      } else {
+        const img = kind === 'png' ? await doc.embedPng(u8) : await doc.embedJpg(u8);
+        const W = 595.28, H = 841.89, M = 36, cap = 18;
+        const land = img.width > img.height;
+        const page = doc.addPage(land ? [H, W] : [W, H]);
+        const pw = page.getWidth(), ph = page.getHeight();
+        const sc = Math.min((pw - 2 * M) / img.width, (ph - 2 * M - cap) / img.height, 1.5);
+        const w = img.width * sc, h = img.height * sc;
+        page.drawText(('FSO ' + fso.fsoNumber + ' — attachment: ' + a.name).slice(0, 110), { x: M, y: ph - M - 10, size: 9, font, color: rgb(0.35, 0.35, 0.35) });
+        page.drawImage(img, { x: (pw - w) / 2, y: (ph - M - cap - h), width: w, height: h });
+      }
+      res.merged.push(a.name);
+    } catch (e) { console.warn('merge attachment', a.name, e); res.skipped.push(a.name); }
+  }
+  res.bytes = await doc.save();
+  return res;
+}
+
+// ---- "Sent" = emailed to someone else, or shared ----------------------------
+function markSent(fso, how) {
+  if (fso.status === 'complete') { addHistory(fso, how); return; }
+  if (fso.status !== 'sent') addHistory(fso, 'Status: ' + statusLabel(fso.status) + ' → Sent (' + how + ')');
+  else addHistory(fso, how);
+  fso.status = 'sent';
+  if (!fso.exportedDate) fso.exportedDate = todayStr();
+}
+function emailCountsAsSent(recipients, ccList) {
+  const mine = (APP.settings.engineerEmail || '').trim().toLowerCase();
+  return recipients.concat(ccList || []).some(a => a && a.trim().toLowerCase() !== mine);
+}
+
+// ---- Delete → move the OneDrive job folder to "Deleted FSO's" --------------
+const DELETED_FOLDER = "Deleted FSO's";
+async function odMoveToDeleted(book, title) {
+  const bookFolderId = await odEnsureBookFolder(book);
+  let item;
+  try { item = await gFetch('GET', '/me/drive/items/' + bookFolderId + ':/' + encodeURIComponent(title).replace(/'/g, '%27'), { quiet: true }); }
+  catch (e) { if (e.status === 404) return false; throw e; }
+  if (!item || !item.id) return false;
+  const delId = await odEnsureChildFolder(bookFolderId, DELETED_FOLDER);
+  await gFetch('PATCH', '/me/drive/items/' + item.id, { json: {
+    parentReference: { id: delId },
+    name: sanitizeName(title + ' (deleted ' + todayStr() + ')', 120),
+    '@microsoft.graph.conflictBehavior': 'rename' } });
+  return true;
+}
+
+// ---- PDF badge: compares what is on screen with the last PDF ----------------
+async function refreshPdfBadge(fso) {
+  const el = document.getElementById('pdf-badge');
+  if (!el || !fso.pdfLast) return;
+  try {
+    const dh = await fsoDataHash(fso), sg = await fsoSigHashes(fso);
+    const same = fso.pdfLast.title === fsoDocTitle(fso) && fso.pdfLast.dataHash === dh &&
+                 fso.pdfLast.sigEng === sg.eng && fso.pdfLast.sigCust === sg.cust;
+    el.style.background = 'var(--' + (same ? 'green' : 'orange') + '-light)';
+    el.style.color = 'var(--' + (same ? 'green' : 'orange') + ')';
+    el.textContent = same ? '✓ Up to date · ' + fso.pdfLast.name : '● Changed since ' + fso.pdfLast.name + ' — Print PDF / Update';
+  } catch (e) {}
+}
+
+// ============================================================
 // v2.12.0 — FSO numbering, Create vs Print PDF / Update, currency
 // ============================================================
 // Switched-off features (code kept; flip to true to bring them back):
@@ -5207,7 +5497,8 @@ async function fsoDataHash(fso) {
   const pick = Object.assign({}, h); delete pick._defaultKm; delete pick.folderDesc;
   return sha16(JSON.stringify({
     h: pick, label: fsoCustLabel(fso), mode: fso.jobMode, q: isQuote(fso) ? fso.quote : null,
-    days: (fso.days || []).map(d => [d.date, d.km, d.workDone, d.ntHours, d.ot15Hours, d.ot20Hours]),
+    days: (fso.days || []).map(d => [d.date, d.km, d.workDone, d.ntHours, d.ot15Hours, d.ot20Hours, d.details || '']),
+    atts: pdfMergeList(fso).map(a => a.id),
     mats: materialSheetRows(fso), acc: fsoHasAcc(fso) ? [fso.accommodation, fso.nights] : null,
     rates: t.rates, totals: [t.subtotal, t.vatAmt, t.total], cur: [fsoCur(fso).code, t.fxRate, fsoCur(fso).addVat],
     eng: book && [book.config.engineerName, book.config.engineerContact]
@@ -5216,7 +5507,7 @@ async function fsoDataHash(fso) {
 async function fsoSigHashes(fso) {
   const s = fso.signatures || {};
   return {
-    eng: s.engineer ? await sha16('e' + s.engineer) : '',
+    eng: engineerSigFor(fso) ? await sha16('e' + engineerSigFor(fso)) : '',
     cust: s.customer ? await sha16('c' + s.customer + '|' + (s.customerName || '') + '|' + (s.customerSignDate || '')) : ''
   };
 }
@@ -5247,19 +5538,34 @@ async function ensureFsoPdf(fso, opts) {
   const xlsxName = title + ' FSO.xlsx';
   const xlsxBytes = await generateXLSXFilled(fso);
   const item = await odPutFile(folderId, xlsxName, xlsxBytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  const pdfBytes = await odConvertToPdf(item.id, xlsxName);
+  let pdfBytes = await odConvertToPdf(item.id, xlsxName);
+  let mergeNote = '';
+  try {
+    const mg = await mergeAttachmentsIntoPdf(fso, pdfBytes);
+    pdfBytes = mg.bytes;
+    if (mg.merged.length) mergeNote = ', ' + mg.merged.length + ' attachment(s) added';
+    if (mg.skipped.length) { mergeNote += ', not added: ' + mg.skipped.join(', '); toast('Not added to the PDF (sent as separate files): ' + mg.skipped.join(', '), 5000); }
+  } catch (e) { console.warn('merge', e); toast('Attachments could not be added to the PDF: ' + (e.message || e)); mergeNote = ', attachments NOT merged'; }
   const lastFullySigned = last && last.sigEng && last.sigCust;
   const onlySigsAdded = sameData && !lastFullySigned &&
     (!last.sigEng || last.sigEng === sig.eng) && (!last.sigCust || last.sigCust === sig.cust);
-  let pdfName, how;
-  if (onlySigsAdded) { pdfName = last.name; how = 'signatures added — unsigned PDF replaced'; }
-  else {
-    pdfName = await odNextPdfName(folderId, title + ' FSO');
+  const custSigned = !!(fso.signatures && fso.signatures.customer);
+  let pdfName, how, rev, replaced = null;
+  if (onlySigsAdded) {
+    rev = last.rev !== undefined ? last.rev : Math.max(0, pdfRevOf(last.name, title));
+    pdfName = pdfFileName(title, rev, custSigned);
+    how = 'signatures added — unsigned PDF replaced';
+    if (pdfName !== last.name) replaced = last.name;
+  } else {
+    rev = await odNextPdfRev(folderId, title);
+    pdfName = pdfFileName(title, rev, custSigned);
     how = !last ? 'first PDF' : (sameData ? 'signatures changed on a signed PDF — new revision' : 'data changed — new revision');
   }
+  how += mergeNote;
   await odPutFile(folderId, pdfName, pdfBytes, 'application/pdf');
+  if (replaced) await odDeleteChild(folderId, replaced);
   try { await uploadReceipts(fso, folderId); } catch (e) { console.warn('receipts', e); }
-  fso.pdfLast = { name: pdfName, title, dataHash, sigEng: sig.eng, sigCust: sig.cust, at: Date.now() };
+  fso.pdfLast = { name: pdfName, title, rev, dataHash, sigEng: sig.eng, sigCust: sig.cust, at: Date.now() };
   fso.docsBuiltAt = Date.now();
   addHistory(fso, 'PDF ' + pdfName + ' (' + how + ')');
   await cachePdf(fso, pdfBytes);
@@ -5284,8 +5590,9 @@ async function odLatestPdfName(fso) {
   const base = fsoDocTitle(fso) + ' FSO';
   const kids = await gFetch('GET', '/me/drive/items/' + folderId + '/children?$select=name&$top=200');
   const names = (kids.value || []).map(k => k.name);
-  let best = names.includes(base + '.pdf') ? base + '.pdf' : null, rev = 0;
-  names.forEach(n => { const m = n.startsWith(base + ' Rev ') && /Rev (\d+)\.pdf$/.exec(n); if (m && +m[1] > rev) { rev = +m[1]; best = n; } });
+  let best = null, rev = -1;
+  const title = fsoDocTitle(fso);
+  names.forEach(n => { const r = pdfRevOf(n, title); if (r > rev || (r === rev && /Signed\.pdf$/.test(n))) { rev = r; best = n; } });
   return best;
 }
 
@@ -5365,7 +5672,7 @@ async function sharePdf() {
     const file = new File([p.bytes], p.name, { type: 'application/pdf' });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: p.name.replace(/\.pdf$/, ''), text: 'Field Service Order ' + fso.fsoNumber });
-      addHistory(fso, 'PDF shared: ' + p.name); saveFsoData(fso);
+      markSent(fso, 'PDF shared: ' + p.name); saveFsoData(fso); renderFsoEdit();
       return;
     }
     downloadBlob(p.bytes, p.name, 'application/pdf');
@@ -5373,12 +5680,13 @@ async function sharePdf() {
   } catch (e) { if (!e || e.name !== 'AbortError') toast('Share failed: ' + (e.message || e)); }
 }
 function pdfStateBadge(fso) {
+  if (fso.pdfLast) setTimeout(() => refreshPdfBadge(fso), 0);
   const last = fso.pdfLast;
   let colour, text;
   if (!last && !fso.docsBuiltAt) { colour = 'grey'; text = fso.jobCreatedAt ? 'Job created · no PDF yet' : 'Not created in OneDrive yet'; }
   else if ((fso.modifiedAt || 0) > (fso.docsBuiltAt || 0)) { colour = 'orange'; text = 'Changed since ' + (last ? last.name : 'last PDF') + ' — Print PDF / Update'; }
   else { colour = 'green'; text = 'Up to date · ' + (last ? last.name : 'PDF printed'); }
-  return '<div style="padding:8px 10px;border-radius:10px;margin-bottom:10px;font-size:.8rem;background:var(--' + colour + '-light);color:var(--' + colour + ')">' +
+  return '<div id="pdf-badge" style="padding:8px 10px;border-radius:10px;margin-bottom:10px;font-size:.8rem;background:var(--' + colour + '-light);color:var(--' + colour + ')">' +
     (colour === 'green' ? '✓ ' : colour === 'orange' ? '● ' : '○ ') + esc(text) + '</div>';
 }
 
@@ -5629,12 +5937,9 @@ function openFsoCustomerInMaps() {
 function pasteCustomerLocation() {
   const v = (prompt('Paste the location from Google Maps.\n\nLong-press the pin in Google Maps and copy the coordinates (e.g. -34.0217, 18.8473), or paste the full map link.') || '').trim();
   if (!v) return;
-  const m = /(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/.exec(decodeURIComponent(v)) ||
-            /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(v) ||
-            /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(v);
-  if (!m) { toast('No coordinates found — copy the numbers under the pin, e.g. -34.0217, 18.8473'); return; }
-  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
-  if (!(Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) { toast('Those coordinates are out of range'); return; }
+  const g = parseCoords(v);
+  if (!g) { toast('No coordinates found — copy the numbers under the pin, e.g. -34.0217, 18.8473'); return; }
+  const lat = g.lat, lng = g.lng;
   const c = currentCustomer();
   if (!c) return;
   c.gps = { lat, lng };
@@ -6267,7 +6572,7 @@ function useSavedKm() {
 
 function gpsEstimateKm() {
   const office = APP.settings.office && APP.settings.office.gps;
-  if (!office) { toast('Set the office location in Settings first'); return; }
+  if (!office) { toast('Set the office location in Settings → Office Location first'); return; }
   toast('Getting location…');
   getPosition().then(pos => {
     const here = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -6455,7 +6760,7 @@ async function odEnsureChildFolder(parentId, name) {
   if (!parentId) throw new Error('No parent folder id when creating "' + name + '"');
   const safe = sanitizeName(name, 110);
   if (!safe) throw new Error('Refusing to create a folder with an empty name (from "' + name + '")');
-  const byPath = '/me/drive/items/' + parentId + ':/' + encodeURIComponent(safe);
+  const byPath = '/me/drive/items/' + parentId + ':/' + encodeURIComponent(safe).replace(/'/g, '%27');
   try {
     return (await gFetch('GET', byPath, { quiet: true })).id;
   } catch (e) {
@@ -6821,7 +7126,7 @@ async function odEmailFso(fso, recipients, pdfBytes, ccList, kind) {
   // Graph direct-attach limit is ~3MB total; include ticked attachments while they fit.
   let budget = 2.6 * 1024 * 1024 - (atts[0].contentBytes.length * 0.75);
   const skipped = [];
-  for (const a of (fso.attachments || []).filter(a => a.includeInExport && (!a.receipt || kind === 'admin'))) {
+  for (const a of (fso.attachments || []).filter(a => a.includeInExport && (!a.receipt || kind === 'admin') && (!pdfBytes || !attPrints(a)))) {
     const b64 = await attGetB64(a);
     if (!b64) { skipped.push(a.name); continue; }
     const sz = b64.length * 0.75;
@@ -6851,6 +7156,7 @@ async function odEmailFso(fso, recipients, pdfBytes, ccList, kind) {
       attachments: atts
     }, saveToSentItems: true } });
   logAction('email sent (' + (kind || 'copy') + ') to [' + recipients.join(', ') + '] cc [' + ccList.join(', ') + ']');
+
   if (skipped.length) toast('Emailed — too large to attach: ' + skipped.join(', '));
 }
 
@@ -7138,7 +7444,8 @@ function fsoSheetWrites(fso) {
   W.push({ address: 'AM25:AM39', values: cols.AM });
 
   one('AM40', t.totalMaterials || '');
-  one('A42', h.description || '');           // job overview / work done block A42:A59
+  { const cl = commentLines(fso);            // job overview + dated day details, A42:A59
+    W.push({ address: 'A42:A59', values: Array.from({ length: COMMENT_ROWS }, (_, i) => [cl[i] || '']) }); }
   one('I68', fsoHasAcc(fso) ? (parseFloat(fso.nights) || '') : '');
   one('M68', fsoHasAcc(fso) ? (Math.round((parseFloat(fso.accommodation) || 0) * fxr * 100) / 100 || '') : '');
   const engName = (APP.books[fso.bookId].config.engineerName || '');
@@ -7349,12 +7656,15 @@ async function odDrainQueue() {
         await syncBook(op.bookId);
       } else if (op.type === 'syncBook') {
         await syncBook(op.bookId);
+      } else if (op.type === 'moveDeleted') {
+        const book = APP.books[op.bookId];
+        if (book) await odMoveToDeleted(book, op.title);
       } else if (op.type === 'exportFso') {
         const book = APP.books[op.bookId];
         const fso = book && book.fsos[op.fsoId];
         if (fso) {
           await odExportFso(fso);
-          fso.status = 'sent'; fso.exportedDate = todayStr(); fso.exportState = 'sent';
+          fso.exportedDate = todayStr(); fso.exportState = 'sent';
           let pdfBytes = null;
           if (op.fmt === 'pdf') {
             try { const pdf = await ensureFsoPdf(fso); pdfBytes = pdf.bytes; addHistory(fso, 'PDF exported (queued send): ' + pdf.name); }

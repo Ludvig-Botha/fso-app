@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.13.0 — 2026-11-27
+- **Office location fixed.** The office is now pre-set to John Thompson, Sacks
+  Circle, Bellville South (33°55'44.1"S 18°38'30.8"E = -33.928917, 18.641889),
+  so the GPS estimate works straight away. Settings → Office Location also takes
+  typed / pasted coordinates (decimal, degrees-minutes-seconds or a Google Maps
+  link) and has a "JT Bellville office" reset. Customer "Paste location" accepts
+  the same formats.
+- **Day details.** Each day has a second, longer "More detail about this day's
+  work" field. The short description stays on the hours/km line; the details
+  print in the "For customer's attention" comments block under the job
+  description, each starting with the day's date (wrapped over the 18 lines).
+- **Edit customer** (✎) next to "+" on FSO Details opens the selected customer;
+  back returns to the same FSO.
+- **Saved engineer signature.** Settings → Engineer Profile → My signature →
+  "Sign once". Used on every FSO you print unless that FSO has its own engineer
+  signature (shown faded on the FSO page). Kept on this device and in backups.
+- **Attachments printed with the FSO.** Attachments ticked "Print with PDF" are
+  added after the FSO page in the same PDF (PDF attachments page by page,
+  photos one per page). PDFs you add are ticked by default, photos are not, and
+  material receipts can never be printed. Files that can't be turned into pages
+  (Word, Excel, …) are still emailed separately; printed ones are not attached
+  twice. pdf-lib is loaded on demand, pinned with a Subresource Integrity hash.
+- **"Signed" in the file name** once the customer has signed:
+  "… FSO Signed.pdf", "… FSO Rev 1 Signed.pdf". When the only change is the
+  signatures, the unsigned file is replaced and removed, so only the signed
+  copy remains.
+- **Sent = shared.** An FSO is marked Sent only when its PDF is shared with
+  Share PDF. Exporting or emailing no longer changes the status.
+- **Active FSOs filters:** All · Open · In Progress · Signed · **Sent** ·
+  **Completed**. "All" now lists every used FSO in the work book, whatever its
+  status, in FSO number order (47700, 47701, 47702 …).
+- **Deleting an FSO** moves its OneDrive job folder to "Deleted FSO's" inside the
+  work book folder (renamed "… (deleted <date>)"); offline, the move waits in the
+  queue until you're back online.
+- PDF badge on the FSO page now compares the actual printed data, so a status
+  change alone no longer says the PDF is out of date.
+- SW cache v32.
+
 ## v2.12.0 — 2026-11-26
 - **The app's FSO number is the number of record.** The "Official FSO number
   (SharePoint)" section and the hard export block are switched off

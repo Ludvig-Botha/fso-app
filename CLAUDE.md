@@ -18,7 +18,9 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
    exception to "never overwrite": a PDF that was not fully signed is replaced (same name) when
    the only change is signatures being added. A fully signed PDF is never overwritten. The
    working `.xlsx` always carries the LATEST data and is overwritten freely. Every PDF goes
-   through `ensureFsoPdf` — never call `odMakeFsoPdf` (legacy).
+   through `ensureFsoPdf` — never call `odMakeFsoPdf` (legacy). Names: `pdfFileName(title, rev,
+   signed)` → "<title> FSO[ Rev N][ Signed].pdf" (Signed = customer signature present); when an
+   unsigned PDF is replaced by its signed copy the unsigned file is deleted.
 2. **The app's FSO number is the number of record** (v2.12.0). The official-number field and the
    export hard block still exist behind `FEATURES.officialNo` (false) — do not re-enable without
    Ludvig's go-ahead. Gates use `officialNoMissing(fso)`.
@@ -143,6 +145,26 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
   <start>-<end>.xlsx" (All sheet + one sheet per FSO, filled by Export). All sheet column K =
   currency, written by `odExportFso`.
 - `FEATURES.spJobFolder` (false) hides the SharePoint job folder / upload feature.
+
+## v2.13.0 additions
+
+- **Office GPS** defaults to `OFFICE_DEFAULT_GPS` (-33.928917, 18.641889, JT Bellville) in
+  `migrateData`; `parseCoords()` reads decimal, DMS and Google Maps links (office + customers).
+- **Day details** `day.details` → `commentLines(fso)`: description, blank line, then
+  "dd/mm/yyyy – details" wrapped to 115 chars over A42:A59 (18 merged rows) on BOTH writers.
+- **Engineer signature**: `APP.settings.engineerSignature` (per device, in backups);
+  `engineerSigFor(fso)` is used for the sheet image, the signature hash and validation.
+  `openSig('profile')` / `confirmSig` handle the profile mode.
+- **Attachments in the PDF**: `attPrints(a)` (`a.printWithPdf`; default true for PDFs, false for
+  images; receipts never) → `mergeAttachmentsIntoPdf` (pdf-lib, SRI-pinned, loaded on demand).
+  Their ids are part of `fsoDataHash`. Emails don't attach printed attachments again.
+- **Status Sent** is set ONLY by Share PDF (`markSent`). Export/email no longer change it.
+- **Active FSOs**: pills All/Open/In Progress/Signed/Sent/Completed; All = every non-available FSO,
+  sorted by FSO number (numeric).
+- **Delete** moves the job folder to `<book folder>/Deleted FSO's` (`odMoveToDeleted`; offline →
+  queue op `moveDeleted`). `odEnsureChildFolder` encodes "'" as %27 in paths.
+- `editCustomerFromFso()` carries `fsoId/bookId` into the customer screen's ctx (goTo replaces
+  ctx — anything that must survive a round-trip has to be passed along).
 
 ## Azure / Graph
 
