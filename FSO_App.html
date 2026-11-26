@@ -1019,7 +1019,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <button class="btn btn-primary btn-sm" style="flex:1" onclick="openSig('profile')">✍ Sign once</button>
         <button class="btn btn-secondary btn-sm" id="sp-sig-clear" style="flex:1;color:var(--red)" onclick="clearProfileSig()">Remove</button>
       </div>
-      <p style="font-size:.74rem;color:var(--grey);margin-top:8px;line-height:1.5">Added as the engineer signature to every FSO you print from now on (unless that FSO has its own engineer signature). Kept on this device and in your backups.</p>
+      <p style="font-size:.74rem;color:var(--grey);margin-top:8px;line-height:1.5">Added as the engineer signature to every FSO you print from now on (unless that FSO has its own engineer signature). Sign once on your phone — it syncs to your other devices through OneDrive.</p>
     </div>
   </div>
 </div>
@@ -1075,7 +1075,10 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
   <div class="topbar">
     <button class="back-btn" onclick="goBack()">←</button>
     <h1>Customers</h1>
-    <button class="icon-btn" onclick="newCustomer()">＋</button>
+    <div style="display:flex;gap:4px">
+      <button class="icon-btn" title="Search customers" onclick="openCustomerSearch()">🔍</button>
+      <button class="icon-btn" title="New customer" onclick="newCustomerChoice()">＋</button>
+    </div>
   </div>
   <div style="padding:10px 14px 0">
     <button class="btn btn-secondary" style="width:100%" onclick="document.getElementById('cust-import-file').click()">📥 Import from Excel</button>
@@ -1111,7 +1114,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <div id="cust-boilers"></div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">Contacts</div><button class="btn btn-secondary btn-sm" onclick="addCustomerContact()">+ Add</button></div>
+      <div class="card-header"><div class="card-title">Contacts</div><div style="display:flex;gap:6px"><button class="btn btn-secondary btn-sm" onclick="pickPhoneContact()">📇 Phone</button><button class="btn btn-secondary btn-sm" onclick="addCustomerContact()">+ Add</button></div></div>
       <p style="font-size:.72rem;color:var(--grey);margin-bottom:8px">Who you deal with at this company. Used for the signature name pick-list and email suggestions — never printed on the FSO.</p>
       <div id="cust-contacts"></div>
     </div>
@@ -1309,6 +1312,14 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <input class="form-control mono lk-url" id="lk-register" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…">
       </div>
       <button class="btn btn-secondary btn-sm" onclick="safeOpenUrl(document.getElementById('lk-register').value,'FSO register')">Test link ↗</button>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Customer search (🔍 on Customers)</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>Customer search page URL</label>
+        <input class="form-control mono lk-url" id="lk-custsearch" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="safeOpenUrl(document.getElementById('lk-custsearch').value,'customer search')">Test link ↗</button>
     </div>
     <div class="section-label" style="padding-left:2px">SharePoint buttons</div>
     <div id="lk-list"></div>
@@ -1554,7 +1565,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.13.1';
+const APP_VERSION = '2.13.2';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2017,6 +2028,7 @@ function getFso(fsoNumber, bookId) {
 }
 
 function saveFsoData(fso) {
+  autoOpenProgress(fso);          // v2.13.2: Open = details only; In progress = days/materials/amount
   fso.modifiedAt = Date.now();   // used for multi-device conflict detection in syncBook()
   APP.books[fso.bookId].fsos[fso.fsoNumber] = fso;
   saveData();
@@ -2603,7 +2615,7 @@ function setFsoStatus(status) {
   if (STATUS_ARCHIVE.includes(status) && !fso.exportedDate) fso.exportedDate = todayStr();
   saveFsoData(fso);
   renderFsoEdit();
-  toast('Status: ' + STATUS_CHIP[status][1]);
+  toast('Status: ' + STATUS_CHIP[fso.status][1] + (fso.status !== status ? ' (set from what the FSO contains)' : ''));
 }
 
 function editHeader() {
@@ -2938,7 +2950,7 @@ function onBoilerPick(boilerNo) {
 function addCustomerFromFso() {
   // Save current header edits first so they aren't lost, then jump to a new customer
   saveHeaderForm(true);
-  newCustomer({ returnTo: 'screen-header-form', fsoId: ctx.fsoId, bookId: ctx.bookId });
+  newCustomerChoice({ returnTo: 'screen-header-form', fsoId: ctx.fsoId, bookId: ctx.bookId });
 }
 
 function addDepartmentInline(fromList) {
@@ -3026,7 +3038,7 @@ function saveHeaderForm(silent) {
       addHistory(fso, HEADER_LABELS[k] + ': "' + (old[k] || '') + '" → "' + (fso.header[k] || '') + '"');
     }
   });
-  if ((fso.status === 'open' || fso.status === 'available') && fso.header.customer) fso.status = 'progress';
+  if (fso.status === 'available') fso.status = 'open';
   saveFsoData(fso);
   if (!silent) { goBack(); toast('Details saved'); }
 }
@@ -3290,7 +3302,7 @@ function initSigCanvas() {
   sigCtx.setTransform(dpr, 0, 0, dpr, 0, 0);     // keep drawing in CSS pixels
   sigCtx.clearRect(0, 0, cssW, cssH);
   sigCtx.strokeStyle = '#000000';
-  sigCtx.lineWidth = 2.8;
+  sigCtx.lineWidth = 3.4;
   sigCtx.lineCap = 'round';
   sigCtx.lineJoin = 'round';
   sigDrawing = false;
@@ -3453,7 +3465,7 @@ function confirmSig() {
   const b64 = processSignature(canvas);
   if (ctx.sigMode === 'profile') {
     APP.settings.engineerSignature = b64;
-    saveData();
+    profileSigTouched();
     closeSig();
     renderSettingsProfile();
     toast('Signature saved — it will be added to every FSO you print');
@@ -3845,7 +3857,11 @@ function sigToBoxPng(b64, box) {
         try { g.imageSmoothingQuality = 'high'; } catch (e) {}
         const k = Math.min(cw * 0.96 / img.width, ch * 0.92 / img.height);   // inset, keeps ink off the cell borders
         const dw = Math.max(1, img.width * k), dh = Math.max(1, img.height * k);
-        g.drawImage(img, (cw - dw) / 2, (ch - dh) / 2, dw, dh);              // centred, aspect kept
+        // centred, aspect kept; drawn 4× with a sub-pixel offset to bolden thin
+        // strokes, then every inked pixel is made solid black (v2.13.2: was pale)
+        const o = Math.max(0.6, S * 0.45);
+        [[0, 0], [o, 0], [0, o], [o, o]].forEach(([ox, oy]) => g.drawImage(img, (cw - dw) / 2 + ox, (ch - dh) / 2 + oy, dw, dh));
+        inkDarken(g, cw, ch);
         const out = c.toDataURL('image/png').split(',')[1];
         resolve(Uint8Array.from(atob(out), x => x.charCodeAt(0)));
       } catch (e) { reject(e); }
@@ -4390,6 +4406,7 @@ function migrateData() {
     Object.values(b.fsos || {}).forEach(f => {
       migrateFsoMaterials(f);
       if (f.hasAccommodation === undefined) f.hasAccommodation = fsoHasAcc(f);
+      try { autoOpenProgress(f); } catch (e) {}
     });
     if (b.active === undefined) b.active = true;
     // Migrate flat rates → external/internal rate sets
@@ -4878,11 +4895,7 @@ function removeCustomerBoiler(i) {
 function captureCustomerGps() {
   toast('Getting location…');
   getPosition().then(pos => {
-    const c = currentCustomer();
-    if (!c) return;
-    c.gps = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    saveData();
-    document.getElementById('cust-gps-label').textContent = 'Set: ' + c.gps.lat.toFixed(5) + ', ' + c.gps.lng.toFixed(5);
+    applyCustomerGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
     toast('Location captured');
   }).catch(e => toast('Location error: ' + e.message));
 }
@@ -5081,6 +5094,141 @@ function openSpFolder() {
 }
 
 // ============================================================
+// v2.13.2 — signature sync + darker ink, phone contacts, customer search,
+// automatic Open / In progress, Open Job copies customer + total
+// ============================================================
+
+// ---- Saved engineer signature travels between devices (OneDrive index) ------
+function profileSigTouched() {
+  APP.settings.engineerSignatureAt = Date.now();
+  saveData();
+  if (typeof odIsConnected === 'function' && odIsConnected() && isOnline()) syncIndex().catch(e => console.warn('sig push', e));
+}
+function validSigB64(v) { return typeof v === 'string' && v.length < 2500000 && /^iVBORw0KGgo[A-Za-z0-9+/=]*$/.test(v); }
+function mergeSigFromCloud(cs) {
+  if (!cs) return;
+  const localAt = APP.settings.engineerSignatureAt || 0, cloudAt = cs.engineerSignatureAt || 0;
+  if (cloudAt > localAt) {
+    const v = cs.engineerSignature || '';
+    if (v && !validSigB64(v)) return;                 // ignore anything that isn't a PNG signature
+    APP.settings.engineerSignature = v;
+    APP.settings.engineerSignatureAt = cloudAt;
+    saveData();
+    toast(v ? 'Your saved signature was updated from your other device' : 'Saved signature removed (changed on your other device)');
+  } else if (localAt > cloudAt) {
+    linksPushPending = true;                          // push the index so the other device gets it
+  }
+}
+
+// ---- Darker, slightly bolder ink when a signature goes onto the sheet -------
+function inkDarken(g, w, h) {
+  const id = g.getImageData(0, 0, w, h), d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (!a) continue;
+    d[i] = 0; d[i + 1] = 0; d[i + 2] = 0;
+    d[i + 3] = a < 12 ? 0 : Math.min(255, Math.round(a * 2.4 + 25));
+  }
+  g.putImageData(id, 0, 0);
+}
+
+// ---- New customer: pick from phone contacts or type it in ------------------
+const contactsSupported = () => !!(navigator.contacts && navigator.contacts.select);
+async function pickPhoneContact() {
+  if (!contactsSupported()) { toast('Picking phone contacts works in Chrome on Android — enter the details by hand here'); return; }
+  try {
+    let props = ['name', 'email', 'tel'];
+    try { const sup = await navigator.contacts.getProperties(); props = ['name', 'email', 'tel', 'address'].filter(p => sup.includes(p)); } catch (e) {}
+    const res = await navigator.contacts.select(props, { multiple: false });
+    const ct = res && res[0];
+    if (!ct) return;
+    const first = k => (ct[k] && ct[k][0]) || '';
+    const name = String(first('name')).trim(), email = String(first('email')).trim(), tel = String(first('tel')).trim();
+    const nameEl = document.getElementById('cust-name');
+    if (nameEl && !nameEl.value.trim() && name) nameEl.value = name;
+    const ad = first('address');
+    if (ad && typeof ad === 'object') {
+      const addrEl = document.getElementById('cust-address');
+      const lines = [].concat(ad.addressLine || []).concat([ad.city, ad.region, ad.country]).filter(Boolean);
+      if (addrEl && !addrEl.value.trim() && lines.length) addrEl.value = lines.join('\n');
+      const cityEl = document.getElementById('cust-city'), ctryEl = document.getElementById('cust-country');
+      if (cityEl && !cityEl.value.trim() && ad.city) cityEl.value = ad.city;
+      if (ctryEl && !ctryEl.value.trim() && ad.country) ctryEl.value = ad.country;
+    }
+    if (name || email || tel) {
+      if (!custContacts.some(c => (c.name || '') === name && (c.phone || '') === tel)) custContacts.push({ name, email, phone: tel });
+      renderCustomerContacts();
+    }
+    custLabelPreview();
+    toast('Contact added' + (name ? ': ' + name : ''));
+  } catch (e) { if (!e || e.name !== 'AbortError') toast('Could not open contacts: ' + (e.message || e)); }
+}
+function newCustomerChoice(returnCtx) {
+  if (!contactsSupported()) { newCustomer(returnCtx); return; }
+  askChoice('New customer', 'Fill it in from a phone contact, or type the details yourself?', [
+    { label: '📇 Choose from my contacts', value: 'contacts', primary: true },
+    { label: '✎ Enter manually', value: 'manual' }
+  ]).then(ans => {
+    if (ans === null) return;
+    newCustomer(returnCtx);
+    if (ans === 'contacts') setTimeout(pickPhoneContact, 50);
+  });
+}
+
+// ---- Customer location: capture AND paste both offer the round-trip km -------
+function applyCustomerGps(g) {
+  const c = currentCustomer();
+  if (!c || !g) return;
+  c.gps = { lat: g.lat, lng: g.lng };
+  const office = APP.settings.office && APP.settings.office.gps;
+  if (office) {
+    const rf = APP.settings.office.roadFactor || 1.3;
+    const rt = Math.round(haversineKm(office, c.gps) * 2 * rf);
+    const kmEl = document.getElementById('cust-km');
+    if (kmEl && (!parseFloat(kmEl.value) || confirm('Set the default round trip to about ' + rt + ' km (straight line × ' + rf + ' road factor)?'))) {
+      kmEl.value = rt;
+      c.defaultKm = rt;
+    }
+  }
+  saveData();
+  document.getElementById('cust-gps-label').textContent = 'Set: ' + c.gps.lat.toFixed(5) + ', ' + c.gps.lng.toFixed(5);
+}
+
+// ---- Customer search link (🔍 on the Customers page) -------------------------
+function openCustomerSearch() {
+  const url = linksCfg().custSearch;
+  if (!url) { toast('Add the customer search link in Settings → SharePoint shortcuts'); return; }
+  safeOpenUrl(url, 'customer search');
+}
+
+// ---- Open vs In progress follows the content --------------------------------
+// Open = only customer / job details. In progress = has days, materials or an
+// amount (call-out fee not counted) and is not signed or shared yet.
+function fsoHasWork(fso) {
+  if ((fso.days || []).length) return true;
+  if (fsoMaterials(fso).length) return true;
+  if (isQuote(fso)) return (parseFloat(fso.quote && fso.quote.amountExVat) || 0) > 0;
+  const t = calcTotals(fso);
+  return (t.subtotal - (t.coVal || 0)) > 0.004;
+}
+function autoOpenProgress(fso) {
+  if (fso.status !== 'open' && fso.status !== 'progress') return false;
+  const want = fsoHasWork(fso) ? 'progress' : 'open';
+  if (fso.status === want) return false;
+  fso.status = want;
+  return true;
+}
+
+// ---- Open Job: copy "Customer<TAB>total excl. VAT" for the register sheet -----
+function copyJobForRegister(fso) {
+  if (!fso || !navigator.clipboard || !navigator.clipboard.writeText) return null;
+  const t = calcTotalsFx(fso);
+  const amt = (Math.round((t.subtotal || 0) * 100) / 100).toFixed(2);
+  const text = (fsoCustLabel(fso) || fso.header.customer || '') + '\t' + amt;
+  return navigator.clipboard.writeText(text).then(() => text);
+}
+
+// ============================================================
 // v2.13.0 — office location, day details, saved engineer signature,
 // attachments in the PDF, "Signed" file names, Sent status, delete → OneDrive
 // ============================================================
@@ -5170,7 +5318,7 @@ function clearProfileSig() {
   if (!APP.settings.engineerSignature) return;
   if (!confirm('Remove your saved signature?\n\nFSOs that have their own engineer signature keep it; PDFs already printed are not changed.')) return;
   APP.settings.engineerSignature = '';
-  saveData();
+  profileSigTouched();
   renderSettingsProfile();
   toast('Saved signature removed');
 }
@@ -5922,6 +6070,11 @@ function openRfpPage() {
 function openJobRegister() {
   const url = linksCfg().register;
   if (!url) { toast('Add the FSO register link in Settings → SharePoint shortcuts'); return; }
+  const fso = ctx.fsoId ? getFso(ctx.fsoId, ctx.bookId) : null;
+  // Copy first, while the tap still counts as a user action (the clipboard needs it)
+  const cp = fso ? copyJobForRegister(fso) : null;
+  if (cp) cp.then(t => toast('Copied: ' + t.replace('\t', '  ·  ') + ' — paste into the sheet', 4000))
+            .catch(() => toast('Could not copy the customer and total'));
   safeOpenUrl(url, 'FSO register');
 }
 // Google Maps search for the customer (name + city + country). Long-press the
@@ -5950,19 +6103,7 @@ function pasteCustomerLocation() {
   if (!v) return;
   const g = parseCoords(v);
   if (!g) { toast('No coordinates found — copy the numbers under the pin, e.g. -34.0217, 18.8473'); return; }
-  const lat = g.lat, lng = g.lng;
-  const c = currentCustomer();
-  if (!c) return;
-  c.gps = { lat, lng };
-  const office = APP.settings.office && APP.settings.office.gps;
-  if (office) {
-    const rf = APP.settings.office.roadFactor || 1.3;
-    const rt = Math.round(haversineKm(office, c.gps) * 2 * rf);
-    const kmEl = document.getElementById('cust-km');
-    if (kmEl && (!parseFloat(kmEl.value) || confirm('Set the default round trip to about ' + rt + ' km (straight line × ' + rf + ' road factor)?'))) kmEl.value = rt;
-  }
-  saveData();
-  document.getElementById('cust-gps-label').textContent = 'Set: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+  applyCustomerGps(g);
   toast('Location saved');
 }
 
@@ -6035,6 +6176,7 @@ function linksCfg() {
   const L = APP.settings.links;
   if (typeof L.audit !== 'string') L.audit = '';
   if (typeof L.register !== 'string') L.register = '';
+  if (typeof L.custSearch !== 'string') L.custSearch = '';
   L.items.forEach(it => { if (!Array.isArray(it.children)) it.children = []; });
   if (!APP.settings.linksUpdatedAt && (L.audit || L.items.some(it => it.url || it.pinned || it.children.some(c => c.url || c.pinned)))) {
     APP.settings.linksUpdatedAt = Date.now();
@@ -6068,7 +6210,9 @@ function sanitizeLinks(src) {
   if (linkUrlProblem(audit)) audit = '';
   let register = String((src && src.register) || '').trim().slice(0, 2000);
   if (linkUrlProblem(register)) register = '';
-  return { audit, register, items: ((src && Array.isArray(src.items)) ? src.items : []).slice(0, 60).map(n => clean(n, 0)) };
+  let custSearch = String((src && src.custSearch) || '').trim().slice(0, 2000);
+  if (linkUrlProblem(custSearch)) custSearch = '';
+  return { audit, register, custSearch, items: ((src && Array.isArray(src.items)) ? src.items : []).slice(0, 60).map(n => clean(n, 0)) };
 }
 function mergeLinksFromCloud(cs) {
   const localAt = APP.settings.linksUpdatedAt || 0;
@@ -6249,6 +6393,7 @@ function drawLinksEditor() {
   const D = linksDraft;
   document.getElementById('lk-audit').value = D.audit || '';
   document.getElementById('lk-register').value = D.register || '';
+  document.getElementById('lk-custsearch').value = D.custSearch || '';
   const tb = (txt, call, title) => '<button class="lk-tb" title="' + title + '" onclick="' + call + '">' + txt + '</button>';
   const rowEd = (it, i, c) => {
     const isChild = c !== null;
@@ -6293,6 +6438,7 @@ function readLinksForm() {
   });
   D.audit = document.getElementById('lk-audit').value.trim();
   D.register = document.getElementById('lk-register').value.trim();
+  D.custSearch = document.getElementById('lk-custsearch').value.trim();
 }
 
 function lkArr(i, c) { return c === null ? linksDraft.items : linksDraft.items[i].children; }
@@ -6356,8 +6502,10 @@ function saveLinksSettings() {
   if (ap) bad.unshift('Audit Report link ' + ap);
   const rp = linkUrlProblem(D.register);
   if (rp) bad.unshift('FSO register link ' + rp);
+  const cp2 = linkUrlProblem(D.custSearch);
+  if (cp2) bad.unshift('Customer search link ' + cp2);
   // Highlight every bad field
-  document.querySelectorAll('#lk-list [data-f="url"], #lk-audit, #lk-register').forEach(inp => inp.classList.toggle('lk-bad', !!linkUrlProblem(inp.value)));
+  document.querySelectorAll('#lk-list [data-f="url"], #lk-audit, #lk-register, #lk-custsearch').forEach(inp => inp.classList.toggle('lk-bad', !!linkUrlProblem(inp.value)));
   if (bad.length) { toast(bad[0] + (bad.length > 1 ? ' (+' + (bad.length - 1) + ' more)' : ''), 4000); return; }
   APP.settings.links = D;
   linksDraft = null;
@@ -6374,6 +6522,7 @@ async function shareLinks() {
   const payload = { kind: 'fso-app-links', version: 1, exportedAt: new Date().toISOString(),
                     audit: linkUrlProblem(linksDraft.audit) ? '' : linksDraft.audit,
                     register: linkUrlProblem(linksDraft.register) ? '' : (linksDraft.register || ''),
+                    custSearch: linkUrlProblem(linksDraft.custSearch) ? '' : (linksDraft.custSearch || ''),
                     items: linksDraft.items.map(strip) };
   const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 1));
   const name = 'FSO-App-links.json';
@@ -6419,7 +6568,9 @@ function importLinks(event) {
     items.forEach(it => { it.pinned = pinned.has(it.label); it.children.forEach(c => { c.pinned = pinned.has(c.label); }); });
     let register = String(data.register || '').trim().slice(0, 2000);
     if (linkUrlProblem(register)) { register = ''; dropped++; }
-    linksDraft = { audit: audit || linksDraft.audit, register: register || linksDraft.register || '', items };
+    let custSearch = String(data.custSearch || '').trim().slice(0, 2000);
+    if (linkUrlProblem(custSearch)) { custSearch = ''; dropped++; }
+    linksDraft = { audit: audit || linksDraft.audit, register: register || linksDraft.register || '', custSearch: custSearch || linksDraft.custSearch || '', items };
     drawLinksEditor();
     toast('Imported — check the links, then tap ✓ to save' + (dropped ? ' · ' + dropped + ' non-https link(s) removed' : ''), 4000);
   };
@@ -7563,7 +7714,8 @@ function buildIndex() {
       theme: APP.settings.theme, fontSize: APP.settings.fontSize,
       office: APP.settings.office, materialLink: APP.settings.materialLink,
       sharePoint: APP.settings.sharePoint, rates: APP.settings.rates,
-      links: APP.settings.links || null, linksUpdatedAt: APP.settings.linksUpdatedAt || 0
+      links: APP.settings.links || null, linksUpdatedAt: APP.settings.linksUpdatedAt || 0,
+      engineerSignature: APP.settings.engineerSignature || '', engineerSignatureAt: APP.settings.engineerSignatureAt || 0
     },
     books: Object.values(APP.books).map(b => ({
       id: b.id, name: workbookName(b),
@@ -7753,6 +7905,7 @@ async function odMergeFromCloud(idx) {
   if (idx.customers && !(APP.customers || []).length) APP.customers = idx.customers;
   if (idx.settings && idx.settings.rates && !APP.settings.rates) APP.settings.rates = idx.settings.rates;
   try { mergeLinksFromCloud(idx.settings); } catch (e) { console.warn('links merge', e); }
+  try { mergeSigFromCloud(idx.settings); } catch (e) { console.warn('signature merge', e); }
   const parent = await odEnsureFolder();
   let pulled = 0, newBooks = 0;
   for (const bm of (idx.books || [])) {

@@ -174,6 +174,17 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 - Home version banner: `renderHomeVersion()` (silent live-version check every 10 min) /
   `homeVersionAction()`.
 
+## v2.13.2 additions
+
+- Engineer signature syncs via `app_index.json` (`settings.engineerSignature/At`,
+  `mergeSigFromCloud`, `profileSigTouched`; only `iVBORw0KGgo…` PNG base64 accepted).
+- `sigToBoxPng` boldens (4 offset draws) + `inkDarken` → solid black ink on the sheet.
+- `autoOpenProgress(fso)` runs in `saveFsoData` and `migrateData`: open ↔ progress follows
+  `fsoHasWork` (days, materials, quote amount, or subtotal excl. call-out > 0).
+- Phone contacts: Contact Picker API (`pickPhoneContact`, `newCustomerChoice`) — Android Chrome only.
+- `links.custSearch` (Customers 🔍) handled exactly like `links.register`.
+- `openJobRegister` copies `fsoCustLabel + TAB + subtotal (FSO currency)` before opening.
+
 ## Azure / Graph
 
 - MSAL SPA + PKCE, no client secret. Redirect URI = exact GitHub Pages URL, platform "SPA".

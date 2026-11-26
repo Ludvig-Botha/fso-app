@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.13.2 — 2026-11-27
+- **Saved signature syncs between devices.** Sign once on the phone (Settings →
+  Engineer Profile → My signature); it travels through OneDrive to the laptop
+  (newest wins; anything that isn't a PNG signature is ignored).
+- **Darker signatures on the PDF.** Every signature (engineer and customer,
+  including ones already captured) is boldened and made solid black when it
+  is placed on the sheet; new signatures are also drawn with a thicker pen.
+- **New customer from phone contacts.** "+" on Customers (and on FSO Details)
+  asks "Choose from my contacts" or "Enter manually" (Chrome on Android; other
+  devices go straight to manual). The contact's name, email, number and
+  address fill the customer and its contact list. A "📇 Phone" button in the
+  customer's Contacts card adds more contacts the same way.
+- **Capture current location now also offers the default round-trip km**,
+  same as Paste location.
+- **🔍 Customer search** next to "+" on the Customers page opens a link set in
+  Settings → SharePoint shortcuts → Customer search.
+- **Open vs In progress is automatic:** an FSO with only customer / job
+  details is Open; once it has days, materials or an amount (call-out fee not
+  counted) it is In progress, until it is signed or shared.
+- **Open Job copies "Customer, City<TAB>total excl. VAT"** to the clipboard
+  before opening the FSO register, so one paste fills two cells.
+- SW cache v34.
+
 ## v2.13.1 — 2026-11-27
 - Home screen rearranged: version banner at the top ("✓ v2.13.1 · up to date",
   or "update available" with an Update now button; "Check for updates" on the
