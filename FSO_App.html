@@ -1494,7 +1494,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.10.0';
+const APP_VERSION = '2.10.1';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -4927,8 +4927,52 @@ function linksCfg() {
   const L = APP.settings.links;
   if (typeof L.audit !== 'string') L.audit = '';
   L.items.forEach(it => { if (!Array.isArray(it.children)) it.children = []; });
+  if (!APP.settings.linksUpdatedAt && (L.audit || L.items.some(it => it.url || it.pinned || it.children.some(c => c.url || c.pinned)))) {
+    APP.settings.linksUpdatedAt = Date.now();
+  }
   return L;
 }
+// ---- Device sync for links (v2.10.1) ----
+// Links + pins ride along in app_index.json (settings.links) with a timestamp;
+// the newest copy wins on every device signed in to the same OneDrive.
+let linksPushPending = false;
+function linksTouched() {
+  APP.settings.linksUpdatedAt = Date.now();
+  saveData();
+  if (typeof odIsConnected === 'function' && odIsConnected() && isOnline()) {
+    syncIndex().catch(e => console.warn('links push', e));
+  }
+}
+// Re-validate anything that arrives from the cloud before it is used.
+function sanitizeLinks(src) {
+  const okId = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(v)) ? v : newLinkId();
+  const clean = (n, depth) => {
+    n = n || {};
+    let url = String(n.url || '').trim().slice(0, 2000);
+    if (linkUrlProblem(url)) url = '';
+    const out = { id: okId(n.id), icon: shortIcon(n.icon), label: String(n.label || '').trim().slice(0, 60) || 'Untitled',
+                  url, pinned: !!n.pinned, children: [] };
+    if (depth === 0 && Array.isArray(n.children)) out.children = n.children.slice(0, 30).map(c => clean(c, 1));
+    return out;
+  };
+  let audit = String((src && src.audit) || '').trim();
+  if (linkUrlProblem(audit)) audit = '';
+  return { audit, items: ((src && Array.isArray(src.items)) ? src.items : []).slice(0, 60).map(n => clean(n, 0)) };
+}
+function mergeLinksFromCloud(cs) {
+  const localAt = APP.settings.linksUpdatedAt || 0;
+  const cloudAt = (cs && cs.linksUpdatedAt) || 0;
+  if (cs && cs.links && Array.isArray(cs.links.items) && cloudAt > localAt) {
+    APP.settings.links = sanitizeLinks(cs.links);
+    APP.settings.linksUpdatedAt = cloudAt;
+    linksDraft = null;
+    saveData();
+    toast('SharePoint links updated from your other device');
+  } else if (localAt > cloudAt) {
+    linksPushPending = true;   // this device has the newer links — push them up
+  }
+}
+
 function newLinkId() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function linkHost(url) { try { return new URL(url).host; } catch (e) { return ''; } }
 function shortIcon(v) { return Array.from(String(v || '🔗')).slice(0, 3).join('') || '🔗'; }
@@ -4988,7 +5032,7 @@ function togglePin(id) {
   const f = findLink(id);
   if (!f) return;
   f.item.pinned = !f.item.pinned;
-  saveData();
+  linksTouched();
   toast(f.item.pinned ? '★ Pinned to home screen' : 'Removed from home screen');
   refreshNetUi();
 }
@@ -5200,7 +5244,7 @@ function saveLinksSettings() {
   if (bad.length) { toast(bad[0] + (bad.length > 1 ? ' (+' + (bad.length - 1) + ' more)' : ''), 4000); return; }
   APP.settings.links = D;
   linksDraft = null;
-  saveData();
+  linksTouched();
   goBack();
   toast('SharePoint shortcuts saved');
 }
@@ -6377,7 +6421,8 @@ function buildIndex() {
     settings: {
       theme: APP.settings.theme, fontSize: APP.settings.fontSize,
       office: APP.settings.office, materialLink: APP.settings.materialLink,
-      sharePoint: APP.settings.sharePoint, rates: APP.settings.rates
+      sharePoint: APP.settings.sharePoint, rates: APP.settings.rates,
+      links: APP.settings.links || null, linksUpdatedAt: APP.settings.linksUpdatedAt || 0
     },
     books: Object.values(APP.books).map(b => ({
       id: b.id, name: workbookName(b),
@@ -6563,6 +6608,7 @@ async function odSyncNow() {
 async function odMergeFromCloud(idx) {
   if (idx.customers && !(APP.customers || []).length) APP.customers = idx.customers;
   if (idx.settings && idx.settings.rates && !APP.settings.rates) APP.settings.rates = idx.settings.rates;
+  try { mergeLinksFromCloud(idx.settings); } catch (e) { console.warn('links merge', e); }
   const parent = await odEnsureFolder();
   let pulled = 0, newBooks = 0;
   for (const bm of (idx.books || [])) {
@@ -6844,7 +6890,8 @@ async function startup() {
     odEnsureFolder()
       .then(function(fid){ return odGetJson(fid, 'app_index.json'); })
       .then(function(idx){ if (idx) return odMergeFromCloud(idx); })
-      .then(function(){ if (ctx.screen === 'screen-home') renderHome(); return odDrainQueue(); })
+      .then(function(){ if (linksPushPending) { linksPushPending = false; return syncIndex(); } })
+      .then(function(){ if (ctx.screen === 'screen-home') renderHome(); refreshNetUi(); return odDrainQueue(); })
       .catch(function(e){ console.warn('startup sync', e); });
   }).catch(function(e){console.warn(e);});
   window.addEventListener('online', function(){ if (odIsConnected()) odDrainQueue(); });

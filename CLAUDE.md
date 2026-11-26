@@ -72,6 +72,10 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 - Data: `APP.settings.links = { audit, items:[{id, icon, label, url, pinned, children:[…]}] }`,
   created from `LINK_DEFAULTS` by `linksCfg()`. One level of children only. Part of `APP`, so
   it is in every backup automatically. Each engineer enters their own URLs (by design, for now).
+- Device sync (v2.10.1): links + pins travel in `app_index.json` → `settings.links` with
+  `settings.linksUpdatedAt`; `mergeLinksFromCloud()` (called from `odMergeFromCloud`) adopts
+  the newer copy through `sanitizeLinks()`, or sets `linksPushPending` so startup pushes the
+  index. Any change to links must go through `linksTouched()` (stamps + pushes).
 - Editor: Settings → SharePoint shortcuts (`screen-settings-links`). Edits a deep-copied
   `linksDraft`; `readLinksForm()` syncs inputs before any add/move/delete; ← / ✓ run
   `saveLinksSettings()`, which refuses to save while any URL fails `linkUrlProblem()`.

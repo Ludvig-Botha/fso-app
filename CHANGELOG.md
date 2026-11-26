@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.10.1 — 2026-11-26
+- FIX (links entered on one device didn't appear on another): SharePoint
+  shortcut links and pins were saved only on the device they were typed on.
+  They now sync through OneDrive in `app_index.json` (`settings.links` +
+  `settings.linksUpdatedAt`); the newest copy wins on every device signed in to
+  the same OneDrive. Saving the shortcuts or tapping a pin pushes straight away
+  when online; other devices pick it up on app start or Settings → OneDrive
+  Sync → Sync now.
+- Links already entered on v2.10.0 are stamped on first start so they are
+  pushed up automatically.
+- Links arriving from the cloud are re-validated before use (non-https links
+  blanked, ids/labels/icons sanitised), same as an imported links file.
+- SW cache v29.
+
 ## v2.10.0 — 2026-11-26
 - NEW: **SharePoint** button on the home screen. Opens a list of shortcuts to
   company pages: RFP page, Engineering / Service / Energy action request,
