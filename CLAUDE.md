@@ -13,11 +13,15 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 
 ## Hard rules — never break these
 
-1. **Original PDFs are immutable.** First export = `<OfficialNo>.pdf`, never overwritten.
-   Re-exports become `<OfficialNo> Rev 1.pdf`, `Rev 2`, … The working `.xlsx` always carries
-   the LATEST data and is overwritten freely. This rule applies on OneDrive AND SharePoint.
-2. **Export is hard-blocked without the official FSO number.** No bypass, no "send anyway".
-   The wrong number on a signed FSO causes real admin mix-ups.
+1. **PDF revisions (v2.12.0, `ensureFsoPdf`).** First PDF = `<title> FSO.pdf`. A new revision
+   (`… FSO Rev 1.pdf`, `Rev 2`, …) only when printed data changed (`fsoDataHash`). The ONE
+   exception to "never overwrite": a PDF that was not fully signed is replaced (same name) when
+   the only change is signatures being added. A fully signed PDF is never overwritten. The
+   working `.xlsx` always carries the LATEST data and is overwritten freely. Every PDF goes
+   through `ensureFsoPdf` — never call `odMakeFsoPdf` (legacy).
+2. **The app's FSO number is the number of record** (v2.12.0). The official-number field and the
+   export hard block still exist behind `FEATURES.officialNo` (false) — do not re-enable without
+   Ludvig's go-ahead. Gates use `officialNoMissing(fso)`.
 3. **Offline-first.** Signature capture and data entry must work with zero connectivity.
    Nothing may block on the network at capture time; sends queue and drain later.
 4. **Security matters.** PIN lock, no secrets in the repo (the Azure Client ID is public by
@@ -98,6 +102,47 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
   function, else clicks the active screen's visible `.topbar .back-btn` (so save-on-back
   screens still save). Home: toast only. PIN: nothing. Error screen: `errorBackHome()`.
 - New overlays must be added to the list in `handleHardwareBack()`.
+
+## FSO page model (v2.11.0)
+
+- **Materials are per FSO**: `fso.materials[]` = `{id, date, description, stockCode, qty, costPrice,
+  sellingPrice, totalSelling, receiptAttId}`. `migrateFsoMaterials()` (run in `migrateData` and on
+  opening the Materials screen) moves legacy `day.materials` across; `fsoMaterials(fso)` is the ONE
+  reader (totals, page, sheets). Sheet rows: `materialSheetRows()` → AD25:AD39 "name ×qty",
+  AM25:AM39 line total (15 rows, overflow summed into row 15). Receipts are normal attachments
+  flagged `receipt:true`.
+- **Accommodation is opt-in**: `fso.hasAccommodation`; always read through `fsoHasAcc()`. When off,
+  `calcTotals` charges nothing and I68/M68 are left blank on both sheet writers.
+- **Customer label**: `custLabel(c)` = name + city (+ country when not South Africa), from
+  `c.city`/`c.country` or a 4-line address. `fsoCustLabel(fso)` prints in F15 and lists;
+  `fso.header.customer` stays the bare company name (folder/file names unchanged).
+- **Boiler Number & More** values are written back to the customer by `rememberCustomerExtras()`
+  (`jtContractNo`, `poNo`, `vatNo`, `accountNo`, boiler appended to `c.boilers`).
+- **Open Job** → `openJobRegister()` → `APP.settings.links.register` (synced/shared/sanitised with
+  the other links). **RFP page** → the links item with id `rfp`.
+- `askChoice()` / `#choice-overlay` is a small promise-based chooser (registered in
+  `handleHardwareBack`).
+
+## Currency & PDF actions (v2.12.0)
+
+- `fso.currency = {code:'ZAR'|'USD'|'GBP', rate, at, source, addVat}`; `rate` = foreign units per
+  1 ZAR, captured from `FX_URL` (open.er-api.com, CORS ok, no key) at creation or on Update rate,
+  or set by Override ("1 USD = R …"). Never refreshed automatically.
+- `calcTotals` stays in ZAR; `calcTotalsFx` converts money + rates for printing. Both sheet
+  writers use it; materials rows and M68 are multiplied by `t.fxRate`. Local PDF path swaps the
+  template's Rand number formats (`fxStyleXml`, function replacers — "$" in a replace string is
+  special) and headings AM24/R60; the Graph path PATCHes `numberFormat` entries (`w.numberFormat`).
+- Foreign FSOs: VAT excluded unless `currency.addVat` (`fxNoVat`). Print/email blocked while a
+  foreign FSO has no rate.
+- FSO page: **Create** (`createJobOnly`: folder + xlsx + receipts), **Print PDF / Update**
+  (`printPdfUpdate` → `ensureFsoPdf`), **Latest PDF** (`previewLatestPdf`, IndexedDB cache
+  `pdf-<book>-<fso>`), **Share PDF** (Web Share API, download fallback).
+- Receipts (`attachment.receipt`) upload to `<job folder>/Receipts` (`uploadReceipts`), are
+  never printed, and go only with the **admin** email.
+- Book workbook = OneDrive › FSO App › "FSO work book <start>-<end>" › "FSO work book
+  <start>-<end>.xlsx" (All sheet + one sheet per FSO, filled by Export). All sheet column K =
+  currency, written by `odExportFso`.
+- `FEATURES.spJobFolder` (false) hides the SharePoint job folder / upload feature.
 
 ## Azure / Graph
 

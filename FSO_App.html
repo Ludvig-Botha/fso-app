@@ -220,6 +220,13 @@ body.dark #material-overlay .sig-topbar{background:#1b2536}
 /* Date picker overlay */
 #date-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;align-items:center;justify-content:center;padding:20px}
 #date-overlay.show{display:flex}
+#choice-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9600;align-items:center;justify-content:center;padding:24px}
+#choice-overlay.show{display:flex}
+#choice-overlay .choice-box{background:#fff;border-radius:16px;padding:20px;width:100%;max-width:380px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+body.dark #choice-overlay .choice-box{background:#1b2536;color:#e8edf4}
+.hours-mini{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;font-size:.74rem;color:var(--grey)}
+.hours-mini b{color:#111827;font-weight:600}
+body.dark .hours-mini b{color:#e8edf4}
 .date-pop{background:#fff;border-radius:14px;padding:16px;width:100%;max-width:330px;box-shadow:var(--shadow)}
 body.dark .date-pop{background:#1b2536}
 .date-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-weight:600}
@@ -542,6 +549,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <select class="form-control" id="hf-customer-select" onchange="onCustomerPick(this.value)"></select>
         <button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 14px" onclick="addCustomerFromFso()">+</button>
       </div>
+      <button class="btn btn-secondary btn-sm" style="margin-top:6px;width:auto;font-size:.78rem" onclick="openFsoCustomerInMaps()">🗺 Find customer on Google Maps ↗</button>
     </div>
     <div class="form-group" id="hf-boiler-select-group" style="display:none">
       <label>Boiler (from customer)</label>
@@ -556,6 +564,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <div style="display:flex;gap:8px;margin-bottom:4px">
         <button id="hf-mode-callout" class="btn btn-secondary btn-sm" style="flex:1" onclick="setJobMode('CALLOUT')">Call out</button>
         <button id="hf-mode-quote" class="btn btn-secondary btn-sm" style="flex:1" onclick="setJobMode('QUOTE')">Quote</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openRfpPage()">RFP page ↗</button>
       </div>
       <p id="hf-mode-note" style="font-size:.74rem;color:var(--grey);line-height:1.5;margin-top:6px"></p>
     </div>
@@ -602,7 +611,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <select class="form-control" id="hf-time"></select>
       </div>
     </div>
-    <div class="card" style="margin-bottom:14px">
+    <div class="card" id="hf-official-card" style="margin-bottom:14px;display:none">
       <div class="card-title" style="margin-bottom:8px">Official FSO number (SharePoint)</div>
       <p style="font-size:.75rem;color:var(--grey);margin-bottom:10px;line-height:1.45">
         Register the job on SharePoint, then paste the number it gives you here. This is the number
@@ -622,28 +631,6 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
     </div>
     <div class="form-group">
-      <label>JT Contract No.</label>
-      <input class="form-control mono" id="hf-jtcontract" placeholder="Contract number">
-    </div>
-    <div class="form-group">
-      <label>Boiler No.</label>
-      <input class="form-control mono" id="hf-boiler" placeholder="Boiler / equipment number">
-    </div>
-    <div class="form-group">
-      <label>Customer PO No.</label>
-      <input class="form-control mono" id="hf-cupo" placeholder="Purchase order number">
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Customer VAT No.</label>
-        <input class="form-control mono" id="hf-vatnr" placeholder="VAT number">
-      </div>
-      <div class="form-group">
-        <label>Account No.</label>
-        <input class="form-control mono" id="hf-accnr" placeholder="Account number">
-      </div>
-    </div>
-    <div class="form-group">
       <label>For Customer's Attention / Description</label>
       <textarea class="form-control" id="hf-desc" rows="3" placeholder="Job description and customer instructions…" oninput="updateFolderPreview()"></textarea>
     </div>
@@ -660,6 +647,33 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <span style="color:var(--grey)">OneDrive folder name:</span><br>
         <span class="mono" id="hf-folder-preview">—</span>
         <div style="color:var(--grey);margin-top:4px" id="hf-folder-preview-note"></div>
+      </div>
+    </div>
+    <button class="btn btn-secondary" id="hf-more-btn" onclick="toggleBoilerMore()" style="display:flex;justify-content:space-between;align-items:center">▸ Boiler Number &amp; More</button>
+    <div id="hf-more-sum" style="font-size:.72rem;color:var(--grey);margin:4px 2px 0;text-align:right"></div>
+    <div id="hf-more" class="card" style="display:none;margin-top:8px" oninput="boilerMoreSummary()">
+      <p style="font-size:.74rem;color:var(--grey);margin-bottom:10px;line-height:1.45">Printed on the FSO when filled in, and remembered on the customer for the next FSO.</p>
+      <div class="form-group">
+        <label>Boiler No.</label>
+        <input class="form-control mono" id="hf-boiler" placeholder="Boiler / equipment number">
+      </div>
+      <div class="form-group">
+        <label>JT Contract No.</label>
+        <input class="form-control mono" id="hf-jtcontract" placeholder="Contract number">
+      </div>
+      <div class="form-group">
+        <label>Customer PO No.</label>
+        <input class="form-control mono" id="hf-cupo" placeholder="Purchase order number">
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:0">
+          <label>Customer VAT No.</label>
+          <input class="form-control mono" id="hf-vatnr" placeholder="VAT number">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Account No.</label>
+          <input class="form-control mono" id="hf-accnr" placeholder="Account number">
+        </div>
       </div>
     </div>
     <div style="height:8px"></div>
@@ -711,16 +725,23 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         </div>
       </div>
     </div>
-    <!-- Materials -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Materials</div>
-        <button class="btn btn-secondary btn-sm" onclick="addDayMaterial()">+ Add</button>
-      </div>
-      <div id="df-materials">
-        <!-- Rendered by renderDayMaterials() -->
-      </div>
-    </div>
+    <div style="height:8px"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MATERIALS (per FSO, v2.11.0) -->
+<!-- ============================================================ -->
+<div id="screen-materials" class="screen">
+  <div class="topbar">
+    <button class="back-btn" onclick="saveMaterials()">←</button>
+    <h1 id="materials-title">Materials</h1>
+    <button class="icon-btn" onclick="saveMaterials()">✓</button>
+  </div>
+  <div class="body">
+    <p style="font-size:.76rem;color:var(--grey);margin-bottom:10px;line-height:1.45">Everything bought or drawn from stores for this FSO. The FSO prints each item's name, quantity and price; the date and receipt photo stay in the app (receipts are added to Attachments).</p>
+    <div id="df-materials"></div>
+    <button class="btn btn-secondary" onclick="addDayMaterial()">+ Add material</button>
     <div style="height:8px"></div>
   </div>
 </div>
@@ -744,7 +765,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         Not connected to OneDrive — the export will be queued and synced automatically next time you're online &amp; signed in.
       </div>
     </div>
-    <div class="card">
+    <div class="card" id="exp-official-card" style="display:none">
       <div class="card-title" style="margin-bottom:8px">Official FSO number</div>
       <div id="exp-official-ok" style="display:none;padding:10px;border-radius:10px;background:var(--green-light);font-size:.85rem;color:#166534">
         ✓ Official FSO No: <strong id="exp-official-no" class="mono"></strong>
@@ -1064,8 +1085,13 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <button class="icon-btn" onclick="deleteCustomer()" title="Delete" style="color:var(--red)">🗑️</button>
   </div>
   <div class="body">
-    <div class="form-group"><label>Customer Name</label><input class="form-control" id="cust-name" placeholder="Company / customer name"></div>
+    <div class="form-group"><label>Customer Name</label><input class="form-control" id="cust-name" placeholder="Company / customer name" oninput="custLabelPreview()"></div>
     <div class="form-group"><label>Address / Site</label><textarea class="form-control" id="cust-address" rows="2" placeholder="Site address"></textarea></div>
+    <div class="form-row">
+      <div class="form-group"><label>City / town</label><input class="form-control" id="cust-city" placeholder="e.g. Swellendam" oninput="custLabelPreview()"></div>
+      <div class="form-group"><label>Country</label><input class="form-control" id="cust-country" placeholder="South Africa" oninput="custLabelPreview()"></div>
+    </div>
+    <div style="font-size:.72rem;color:var(--grey);margin:-6px 2px 12px">Shown as <span id="cust-label-preview" style="font-weight:600"></span> in lists and on the FSO. The country is only added for customers outside South Africa.</div>
     <div class="form-row">
       <div class="form-group"><label>VAT No.</label><input class="form-control mono" id="cust-vat" placeholder="VAT number"></div>
       <div class="form-group"><label>Account No.</label><input class="form-control mono" id="cust-account" placeholder="Account number"></div>
@@ -1084,6 +1110,10 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       <div class="card-header"><div class="card-title">Customer GPS (for km estimate)</div></div>
       <div id="cust-gps-label" style="font-size:.85rem;color:var(--grey);margin-bottom:10px">Not set</div>
       <button class="btn btn-secondary" onclick="captureCustomerGps()">📍 Capture current location</button>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="openCustomerInMaps()">🗺 Find on Google Maps ↗</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="pasteCustomerLocation()">📋 Paste location</button>
+      </div>
     </div>
     <button class="btn btn-primary" onclick="saveCustomer()">Save Customer</button>
   </div>
@@ -1152,7 +1182,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
     <button class="icon-btn" onclick="saveSharePointSettings()">✓</button>
   </div>
   <div class="body">
-    <div class="card">
+    <div class="card" id="sp-register-card" style="display:none">
       <div class="card-title" style="margin-bottom:8px">Job registration page</div>
       <p style="font-size:.78rem;color:var(--grey);margin-bottom:10px;line-height:1.5">
         The page where a new job is registered on SharePoint (where the official FSO number is issued
@@ -1191,7 +1221,7 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
       </div>
       <div class="form-group" style="margin-bottom:0"><label>Service manager email (CC)</label><input class="form-control" id="sp-manager-email" type="email" placeholder="manager@…"></div>
     </div>
-    <div class="card">
+    <div class="card" id="sp-upload-card" style="display:none">
       <div class="card-title" style="margin-bottom:8px">Upload exports to SharePoint</div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="font-size:.85rem;font-weight:500">Upload PDF/xlsx to the job folder</div>
@@ -1256,6 +1286,14 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
         <input class="form-control mono lk-url" id="lk-audit" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…">
       </div>
       <button class="btn btn-secondary btn-sm" onclick="lkTestAudit()">Test link ↗</button>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">FSO register (Open Job)</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <label>FSO register sheet URL — opened by "Open Job" on every FSO</label>
+        <input class="form-control mono lk-url" id="lk-register" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://…">
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="safeOpenUrl(document.getElementById('lk-register').value,'FSO register')">Test link ↗</button>
     </div>
     <div class="section-label" style="padding-left:2px">SharePoint buttons</div>
     <div id="lk-list"></div>
@@ -1412,6 +1450,13 @@ body.dark [style*="color:#374151"]{color:#cbd5e1 !important}
 <!-- ============================================================ -->
 <!-- DATE PICKER OVERLAY -->
 <!-- ============================================================ -->
+<div id="choice-overlay" onclick="if(event.target===this)closeChoice()">
+  <div class="choice-box">
+    <div id="choice-title" style="font-weight:700;font-size:1.05rem;margin-bottom:6px"></div>
+    <div id="choice-text" style="font-size:.86rem;color:var(--grey);line-height:1.5"></div>
+    <div id="choice-buttons" style="margin-top:8px"></div>
+  </div>
+</div>
 <div id="date-overlay">
   <div class="date-pop">
     <div class="date-head">
@@ -1494,7 +1539,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.10.1';
+const APP_VERSION = '2.12.0';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -1720,6 +1765,7 @@ function showScreen(id) {
       case 'screen-settings-material': renderSettingsMaterial(); break;
       case 'screen-settings-onedrive': renderSettingsOneDrive(); break;
       case 'screen-sp-links': renderSpLinks(); break;
+      case 'screen-materials': renderMaterialsScreen(); break;
       case 'screen-sp-group': renderSpGroup(); break;
       case 'screen-settings-links': renderSettingsLinks(); break;
     }
@@ -1921,6 +1967,8 @@ function newFso(fsoNumber, bookId) {
     exportedDate: null,
     accommodation: 0,
     nights: 0,
+    hasAccommodation: false,
+    materials: [],
     spFolderUrl: '',
     lockedRates: null,
     docsBuiltAt: 0,
@@ -1975,12 +2023,19 @@ function createNewFso() {
   const slots = Object.values(book.fsos).filter(f => f.status === 'available');
   if (!slots.length) { toast('No Available FSO slots left in this book'); return; }
   const fso = slots[0];
-  fso.status = 'open';
-  fso.createdDate = todayStr();
-  fso.header.date = todayStr();
-  addHistory(fso, 'FSO created');
-  saveFsoData(fso);
-  goTo('screen-fso-edit', { fsoId: fso.fsoNumber, bookId: fso.bookId });
+  askNewFso(fso.fsoNumber).then(ans => {
+    if (ans === null) return;               // tapped outside: nothing created
+    fso.status = 'open';
+    fso.createdDate = todayStr();
+    fso.header.date = todayStr();
+    fso.hasAccommodation = ans.acc === 'yes';
+    fso.currency = { code: ans.cur, rate: ans.cur === 'ZAR' ? 1 : 0, at: '', source: '', addVat: false };
+    if (!Array.isArray(fso.materials)) fso.materials = [];
+    addHistory(fso, 'FSO created' + (fso.hasAccommodation ? ' (with accommodation)' : '') + (ans.cur !== 'ZAR' ? ', currency ' + ans.cur : ''));
+    saveFsoData(fso);
+    goTo('screen-fso-edit', { fsoId: fso.fsoNumber, bookId: fso.bookId });
+    if (ans.cur !== 'ZAR') updateFsoRate(true);
+  });
 }
 
 // ============================================================
@@ -1996,7 +2051,7 @@ function calcTotals(fso) {
   if (isQuote(fso)) {
     const q = fso.quote || {};
     const sub = parseFloat(q.amountExVat) || 0;
-    const vat = q.addVat ? sub * ((rates.vatPercent === undefined ? 15 : rates.vatPercent) / 100) : 0;
+    const vat = (fsoCur(fso).code !== 'ZAR' ? fsoCur(fso).addVat : q.addVat) ? sub * ((rates.vatPercent === undefined ? 15 : rates.vatPercent) / 100) : 0;
     return { totalNT: 0, totalOT15: 0, totalOT20: 0, totalKm: 0, totalMaterials: 0,
              engTime: 0, ot15val: 0, ot20val: 0, kmVal: 0, accVal: 0, coVal: 0, nights: 0,
              subtotal: sub, vatAmt: vat, total: sub + vat, rates, quoted: true };
@@ -2008,19 +2063,17 @@ function calcTotals(fso) {
     totalOT15  += (parseFloat(d.ot15Hours) || 0);
     totalOT20  += (parseFloat(d.ot20Hours) || 0);
     totalKm    += (parseFloat(d.km) || 0);
-    for (const m of (d.materials || [])) {
-      totalMaterials += parseFloat(m.totalSelling) || 0;
-    }
   }
+  for (const m of fsoMaterials(fso)) totalMaterials += parseFloat(m.totalSelling) || 0;
   const engTime = totalNT * rates.nt;
   const ot15val = totalOT15 * rates.ot15;
   const ot20val = totalOT20 * rates.ot20;
   const kmVal   = totalKm * rates.kmRate;
-  const nights  = parseFloat(fso.nights) || 0;
-  const accVal  = (parseFloat(fso.accommodation) || 0) * nights;
+  const nights  = fsoHasAcc(fso) ? (parseFloat(fso.nights) || 0) : 0;
+  const accVal  = fsoHasAcc(fso) ? (parseFloat(fso.accommodation) || 0) * nights : 0;
   const coVal   = rates.callOutRate || 0;
   const subtotal = engTime + ot15val + ot20val + kmVal + totalMaterials + accVal + coVal;
-  const vatAmt  = subtotal * ((rates.vatPercent || 15) / 100);
+  const vatAmt  = fxNoVat(fso) ? 0 : subtotal * ((rates.vatPercent || 15) / 100);
   const total   = subtotal + vatAmt;
   return { totalNT, totalOT15, totalOT20, totalKm, totalMaterials,
            engTime, ot15val, ot20val, kmVal, accVal, coVal, nights,
@@ -2149,6 +2202,7 @@ function renderActive() {
     f.fsoNumber.toLowerCase().includes(q) ||
     (f.header.officialNo || '').toLowerCase().includes(q) ||
     (f.header.customer || '').toLowerCase().includes(q) ||
+    fsoCustLabel(f).toLowerCase().includes(q) ||
     (f.header.description || '').toLowerCase().includes(q) ||
     (f.header.addressSite || '').toLowerCase().includes(q)
   );
@@ -2211,11 +2265,11 @@ function filterArchive() { renderArchive(); }
 function fsoListItem(f) {
   const days = f.days.length;
   const t = calcTotals(f);
-  // Title: FSO sheet number · SharePoint reg number · Company name; sub: job description
+  // Title: FSO number · Customer, City; sub: job description (v2.11.0)
   const bits = ['<span class="mono">' + esc(f.fsoNumber) + '</span>'];
-  if ((f.header.officialNo || '').trim()) bits.push('<span class="mono">' + esc(f.header.officialNo.trim()) + '</span>');
-  if (f.header.customer) bits.push(esc(f.header.customer));
-  const sub = (f.header.description || '').trim() || (f.header.addressSite || 'No site');
+  const lbl = fsoCustLabel(f);
+  if (lbl) bits.push(esc(lbl));
+  const sub = (f.header.description || '').trim() || 'No job description';
   return '<div class="list-item" onclick="openFso(&#39;' + esc(f.fsoNumber) + '&#39;,&#39;' + f.bookId + '&#39;)">' +
     '<div class="icon-circle" style="background:var(--grey-light);font-size:1rem">' + statusIcon(f.status) + '</div>' +
     '<div class="list-item-main">' +
@@ -2225,7 +2279,7 @@ function fsoListItem(f) {
     '<div class="list-item-right">' +
       (f.exportState === 'queued' ? '<div style="font-size:.6rem;font-weight:700;color:#92400e;background:var(--orange-light);padding:2px 6px;border-radius:8px;margin-bottom:4px">READY TO SEND</div>' : '') +
       statusChip(f.status) +
-      '<div style="font-size:.8rem;color:var(--grey);margin-top:4px">' + fmtR(t.total) + '</div>' +
+      '<div style="font-size:.8rem;color:var(--grey);margin-top:4px">' + fmtFso(f, t.total) + '</div>' +
     '</div>' +
   '</div>';
 }
@@ -2269,17 +2323,14 @@ function renderFsoEdit() {
     (isArchived ? '<span class="chip chip-grey" style="font-size:.7rem">Archived</span>' : '<button class="btn btn-secondary btn-sm" onclick="editHeader()">Edit</button>') + '</div>';
   const dash = '<span style="color:var(--grey)">—</span>';
   const fields = [
-    ['Customer',    h.customer ? esc(h.customer) : dash],
+    ['Customer',    fsoCustLabel(fso) ? esc(fsoCustLabel(fso)) : dash],
     ['Site',        h.addressSite ? esc(h.addressSite) : dash],
     ['Job Type',    h.jobType || 'EXTERNAL'],
   ];
   if (h.jobType === 'INTERNAL') fields.push(['Department', h.department ? esc(h.department) : dash]);
   fields.push(
     ['Date',        h.date || '—'],
-    ['Time',        h.time || '—'],
-    ['JT Contract', h.jtContractNo ? esc(h.jtContractNo) : '—'],
-    ['Boiler No.',  h.boilerNo ? esc(h.boilerNo) : '—'],
-    ['Customer PO', h.customerPONo ? esc(h.customerPONo) : '—']
+    ['Time',        h.time || '—']
   );
   fields.forEach(([lbl, val]) => {
     html += '<div class="field-row"><div class="field-label">' + lbl + '</div><div class="field-value">' + val + '</div></div>';
@@ -2289,10 +2340,18 @@ function renderFsoEdit() {
   }
   html += '</div>';
 
-  // Accommodation (per-FSO)
-  if (!isArchived) {
+  // Currency (v2.12.0)
+  html += currencyCardHtml(fso, isArchived);
+
+  // Accommodation (per-FSO, opt-in since v2.11.0)
+  if (!isArchived && !fsoHasAcc(fso)) {
+    html += '<div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px">' +
+      '<div style="font-size:.85rem;color:var(--grey)">No accommodation on this FSO</div>' +
+      '<button class="btn btn-secondary btn-sm" style="width:auto" onclick="setFsoAccommodation(true)">+ Add</button></div>';
+  }
+  if (!isArchived && fsoHasAcc(fso)) {
     html += '<div class="card">';
-    html += '<div class="card-title" style="margin-bottom:10px">Accommodation</div>';
+    html += '<div class="card-header"><div class="card-title">Accommodation</div><button class="btn btn-secondary btn-sm" style="width:auto;color:var(--red)" onclick="setFsoAccommodation(false)">Remove</button></div>';
     html += '<div class="form-row">';
     html += '<div class="form-group" style="margin:0"><label>Rate per night (R)</label>';
     html += '<input class="form-control" type="number" step="0.01" value="' + (parseFloat(fso.accommodation) || 0) + '" placeholder="0.00" onchange="setAccommodation(this.value, &#39;rate&#39;)"></div>';
@@ -2316,8 +2375,9 @@ function renderFsoEdit() {
   if (t.accVal)    html += '<tr><td>Accommodation</td><td>' + fmtR(t.accVal) + '</td></tr>';
   if (t.coVal)     html += '<tr><td>Call-out</td><td>' + fmtR(t.coVal) + '</td></tr>';
   html += '<tr><td>Sub Total</td><td>' + fmtR(t.subtotal) + '</td></tr>';
-  html += '<tr><td>VAT (' + rates.vatPercent + '%)</td><td>' + fmtR(t.vatAmt) + '</td></tr>';
+  html += '<tr><td>VAT (' + (fxNoVat(fso) ? 'excluded' : rates.vatPercent + '%') + ')</td><td>' + fmtR(t.vatAmt) + '</td></tr>';
   html += '<tr class="total-row"><td>TOTAL CHARGED</td><td>' + fmtR(t.total) + '</td></tr>';
+  if (fsoFx(fso).foreign) html += '<tr class="total-row"><td>TOTAL in ' + fsoCur(fso).code + '</td><td>' + fmtFso(fso, t.total) + '</td></tr>';
   html += '</tbody></table></div>';
 
   // Days card
@@ -2333,8 +2393,8 @@ function renderFsoEdit() {
       html += '<div class="day-card-header" onclick="toggleDayCard(' + i + ')">';
       html += '<div style="flex:1"><div style="font-weight:600;font-size:.9rem">' + (d.date || 'No date') + '</div>';
       html += '<div style="font-size:.78rem;color:var(--grey)">' + (d.workDone ? esc(d.workDone).substring(0,40) + (d.workDone.length>40?'…':'') : 'No description') + '</div></div>';
-      html += '<div style="text-align:right;flex-shrink:0"><div style="font-size:.8rem;font-weight:500">' + fmtN(d.ntHours) + 'h NT</div>';
-      html += '<div style="font-size:.75rem;color:var(--grey)">' + fmtN(d.km,0) + ' km</div></div>';
+      html += '<div style="text-align:right;flex-shrink:0"><div class="hours-mini"><span>NT <b>' + fmtN(d.ntHours) + '</b></span><span>1.5 <b>' + fmtN(d.ot15Hours) + '</b></span><span>2.0 <b>' + fmtN(d.ot20Hours) + '</b></span></div>';
+      html += '<div style="font-size:.75rem;color:var(--grey);margin-top:2px">' + fmtN(d.km,0) + ' km</div></div>';
       if (!isArchived) html += '<button onclick="event.stopPropagation();editDay(&#39;' + d.id + '&#39;)" style="margin-left:8px;background:var(--blue-light);border:none;border-radius:6px;padding:6px 10px;font-size:.8rem;cursor:pointer;color:var(--blue);font-weight:500">Edit</button>';
       html += '</div>';
       // Day body (collapsed by default)
@@ -2345,17 +2405,27 @@ function renderFsoEdit() {
       html += '<div class="hours-cell"><div class="hc-label">OT 1.5×</div><div class="hc-val">' + (parseFloat(d.ot15Hours)||0) + '</div></div>';
       html += '<div class="hours-cell"><div class="hc-label">OT 2.0×</div><div class="hc-val">' + (parseFloat(d.ot20Hours)||0) + '</div></div>';
       html += '</div>';
-      if (d.materials && d.materials.length) {
-        html += '<div style="margin:10px 0 6px;font-size:.78rem;font-weight:600;color:var(--grey)">MATERIALS</div>';
-        d.materials.forEach(m => {
-          html += '<div class="mat-row"><div style="flex:1">' + esc(m.description||'—') + (m.stockCode ? ' <span class="chip chip-grey" style="font-size:.7rem;padding:2px 6px">' + esc(m.stockCode) + '</span>' : '') + '</div>';
-          html += '<div class="mono" style="font-size:.8rem">×' + (m.qty||1) + ' ' + fmtR(m.totalSelling) + '</div></div>';
-        });
-      }
       if (!isArchived) {
         html += '<div style="margin-top:10px"><button onclick="deleteDay(&#39;' + d.id + '&#39;)" class="btn btn-danger btn-sm" style="width:auto">Delete Day</button></div>';
       }
       html += '</div></div>';
+    });
+  }
+  html += '</div>';
+
+  // Materials (per FSO, v2.11.0)
+  const mats = fsoMaterials(fso);
+  html += '<div class="card">';
+  html += '<div class="card-header"><div class="card-title">Materials (' + mats.length + ')</div>';
+  if (!isArchived) html += '<button class="btn btn-secondary btn-sm" onclick="openMaterials()">' + (mats.length ? 'Edit' : '+ Add') + '</button>';
+  html += '</div>';
+  if (!mats.length) {
+    html += '<div style="padding:8px 0;color:var(--grey);font-size:.875rem;text-align:center">No materials</div>';
+  } else {
+    mats.forEach(m => {
+      html += '<div class="mat-row"><div style="flex:1;min-width:0">' + esc(m.description || '—') +
+        '<div style="font-size:.72rem;color:var(--grey)">' + (m.date ? esc(fmtDateDMY(m.date) || m.date) : '') + (m.receiptAttId ? ' · 🧾 receipt' : '') + '</div></div>';
+      html += '<div class="mono" style="font-size:.8rem;text-align:right">×' + (m.qty || 1) + ' ' + fmtR(m.totalSelling) + '</div></div>';
     });
   }
   html += '</div>';
@@ -2389,12 +2459,17 @@ function renderFsoEdit() {
   // External systems + preview
   html += '<div class="card">';
   html += '<div class="card-title" style="margin-bottom:10px">Job Documents</div>';
-  html += syncStateBadge(fso);
-  html += '<button class="btn btn-primary" style="margin-bottom:8px" onclick="createOrUpdateJob()">Create / Update job</button>';
-  html += '<div style="display:flex;gap:8px">';
-  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openSpFolder()">SharePoint folder ↗</button>';
-  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="openJobOneDriveFolder()">OneDrive folder ↗</button>';
+  html += pdfStateBadge(fso);
+  html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="createJobOnly()">Create</button>';
+  html += '<button class="btn btn-primary" style="flex:2;margin:0" onclick="printPdfUpdate()">Print PDF / Update</button>';
   html += '</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:8px">';
+  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="previewLatestPdf()">👁 Latest PDF</button>';
+  html += '<button class="btn btn-secondary" style="flex:1;margin:0" onclick="sharePdf()">⤴ Share PDF</button>';
+  html += '</div>';
+  html += '<button class="btn btn-secondary" style="margin:0" onclick="openJobOneDriveFolder()">OneDrive folder ↗</button>';
+  html += '<p style="font-size:.72rem;color:var(--grey);margin-top:8px;line-height:1.45">Create makes the OneDrive job folder and sheet. Print PDF / Update writes the latest data and prints the PDF — a new revision only when something changed; adding signatures to an unsigned PDF replaces it.</p>';
   html += '</div>';
 
   // (Revision history is now opened via the 🕘 History button in the status row.)
@@ -2434,9 +2509,11 @@ function renderFsoEdit() {
   // Bottom action
   if (!isArchived) {
     html += '<button class="btn btn-primary" onclick="goToExport()" style="margin-bottom:8px">Export / Sign Off →</button>';
+    html += '<button class="btn btn-secondary" onclick="openJobRegister()" style="margin-bottom:8px">Open Job ↗</button>';
     html += '<button class="btn btn-danger" onclick="deleteFso()" style="margin-top:4px">Delete FSO</button>';
   } else {
     html += '<button class="btn btn-primary" onclick="goToExport()" style="margin-bottom:8px">Re-Export FSO →</button>';
+    html += '<button class="btn btn-secondary" onclick="openJobRegister()" style="margin-bottom:8px">Open Job ↗</button>';
     html += '<button class="btn btn-secondary" onclick="editArchivedFso()" style="margin-top:4px">Edit (creates revision)</button>';
   }
   html += '<div style="height:8px"></div>';
@@ -2619,8 +2696,8 @@ function timeOptions(selected) {
 function fillCustomerSelect(selectedId) {
   const sel = document.getElementById('hf-customer-select');
   let html = '<option value="">— Select customer —</option>';
-  (APP.customers || []).forEach(c => {
-    html += '<option value="' + c.id + '"' + (c.id === selectedId ? ' selected' : '') + '>' + esc(c.name || 'Unnamed') + '</option>';
+  sortedCustomers().forEach(c => {
+    html += '<option value="' + esc(c.id) + '"' + (c.id === selectedId ? ' selected' : '') + '>' + esc(custLabel(c)) + '</option>';
   });
   sel.innerHTML = html;
 }
@@ -2665,6 +2742,7 @@ function renderHeaderForm() {
   document.getElementById('hf-quote-amt').value = (fso.quote && fso.quote.amountExVat) || '';
   document.getElementById('hf-quote-vat').checked = !(fso.quote && fso.quote.addVat === false);
   document.getElementById('hf-official').value = h.officialNo || '';
+  document.getElementById('hf-official-card').style.display = FEATURES.officialNo ? '' : 'none';
   document.getElementById('hf-spfolder').value = fso.spFolderUrl || '';
   document.getElementById('hf-jtcontract').value = h.jtContractNo || '';
   document.getElementById('hf-boiler').value = h.boilerNo || '';
@@ -2676,6 +2754,8 @@ function renderHeaderForm() {
   updateFolderPreview();
   const cust = (APP.customers || []).find(c => c.id === h.customerId);
   fillBoilerSelect(cust, h.boilerNo || '');
+  boilerMoreSummary();
+  toggleBoilerMore(false);
 }
 
 // Live preview of the folder / file name, built with the same function the
@@ -2788,9 +2868,14 @@ function onCustomerPick(custId) {
   document.getElementById('hf-site').value = c.address || '';
   document.getElementById('hf-vatnr').value = c.vatNo || '';
   document.getElementById('hf-accnr').value = c.accountNo || '';
+  // Boiler Number & More: fill what the customer had last time (only empty fields)
+  const fillIfEmpty = (id, v) => { const el = document.getElementById(id); if (el && !el.value.trim() && v) el.value = v; };
+  fillIfEmpty('hf-jtcontract', c.jtContractNo);
+  fillIfEmpty('hf-cupo', c.poNo);
   // Boilers: fill the picker; if exactly one, set the boiler number directly
   fillBoilerSelect(c, '');
   if ((c.boilers || []).length === 1) document.getElementById('hf-boiler').value = c.boilers[0].boilerNo || '';
+  boilerMoreSummary();
   // Remember the default km on the FSO so the day form can use it
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (fso) { fso.header._defaultKm = c.defaultKm || 0; }
@@ -2884,6 +2969,8 @@ function saveHeaderForm(silent) {
     }
   }
   if (cust && cust.defaultKm) fso.header._defaultKm = cust.defaultKm;
+  fso.header.customerLabel = cust ? custLabel(cust) : (fso.header.customerLabel || fso.header.customer || '');
+  if (rememberCustomerExtras(fso)) saveData();
   // Log per-field changes
   Object.keys(HEADER_LABELS).forEach(k => {
     if ((old[k] || '') !== (fso.header[k] || '')) {
@@ -2928,9 +3015,6 @@ function renderDayForm() {
   document.getElementById('df-nt').value = day.ntHours || '';
   document.getElementById('df-ot15').value = day.ot15Hours || '';
   document.getElementById('df-ot20').value = day.ot20Hours || '';
-  // Copy materials
-  dfMaterials = JSON.parse(JSON.stringify(day.materials || []));
-  renderDayMaterials();
 }
 
 function renderDayMaterials() {
@@ -2944,6 +3028,15 @@ function renderDayMaterials() {
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
         '<div style="font-size:.8rem;font-weight:600;color:var(--grey)">MATERIAL ' + (i+1) + '</div>' +
         '<button onclick="removeDayMat(' + i + ')" style="background:var(--red-light);border:none;border-radius:6px;padding:4px 10px;font-size:.75rem;color:var(--red);cursor:pointer;font-weight:500">Remove</button>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<div class="form-group" style="margin-bottom:8px"><label>Date bought / drawn</label>' +
+          '<input class="form-control" type="date" value="' + esc(m.date || '') + '" onchange="dfMaterials[' + i + '].date=this.value"></div>' +
+        '<div class="form-group" style="margin-bottom:8px"><label>Receipt</label><div style="display:flex;gap:6px">' +
+          '<label class="btn btn-secondary btn-sm" style="flex:1;cursor:pointer;text-align:center">📷 ' + (m.receiptAttId ? 'Replace' : 'Photo') +
+            '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="addMatReceipt(' + i + ',this)"></label>' +
+          (m.receiptAttId ? '<button class="btn btn-secondary btn-sm" style="flex:0 0 auto;padding:0 10px" onclick="viewMatReceipt(' + i + ')">🧾</button>' : '') +
+        '</div></div>' +
       '</div>' +
       '<div class="form-group" style="margin-bottom:8px"><label>Description</label>' +
         '<div style="display:flex;gap:6px">' +
@@ -2986,11 +3079,20 @@ function applyMarkup(i) {
 }
 
 function addDayMaterial() {
-  dfMaterials.push({ id: 'mat-' + uid(), description: '', stockCode: '', costPrice: 0, sellingPrice: 0, qty: 1, totalSelling: 0 });
+  dfMaterials.push({ id: 'mat-' + uid(), date: todayStr(), description: '', stockCode: '', costPrice: 0, sellingPrice: 0, qty: 1, totalSelling: 0 });
   renderDayMaterials();
+  const el = document.getElementById('df-materials');
+  if (el && el.lastElementChild) el.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function removeDayMat(i) {
+async function removeDayMat(i) {
+  const m = dfMaterials[i];
+  if (!m) return;
+  if (m.receiptAttId) {
+    if (!confirm('Remove this material and its receipt photo?')) return;
+    const fso = getFso(ctx.fsoId, ctx.bookId);
+    if (fso) { await removeReceiptAttachment(fso, m.receiptAttId); saveFsoData(fso); }
+  }
   dfMaterials.splice(i, 1);
   renderDayMaterials();
 }
@@ -3009,10 +3111,10 @@ function saveDayForm() {
     ntHours:      parseFloat(document.getElementById('df-nt').value) || 0,
     ot15Hours:    parseFloat(document.getElementById('df-ot15').value) || 0,
     ot20Hours:    parseFloat(document.getElementById('df-ot20').value) || 0,
-    materials:    dfMaterials,
   };
-  addHistory(fso, 'Day ' + (dayIdx + 1) + ' (' + (fso.days[dayIdx].date || 'no date') + ') ' + (wasEmpty ? 'entered' : 'updated') +
-    ': ' + (fso.days[dayIdx].ntHours || 0) + 'h NT, ' + (fso.days[dayIdx].materials.length) + ' material(s)');
+  const dd = fso.days[dayIdx];
+  addHistory(fso, 'Day ' + (dayIdx + 1) + ' (' + (dd.date || 'no date') + ') ' + (wasEmpty ? 'entered' : 'updated') +
+    ': NT ' + (dd.ntHours || 0) + 'h, OT1.5 ' + (dd.ot15Hours || 0) + 'h, OT2.0 ' + (dd.ot20Hours || 0) + 'h');
   if (fso.status === 'open') fso.status = 'progress';
   saveFsoData(fso);
   goBack();
@@ -3327,6 +3429,7 @@ function renderExportScreen() {
   const warn = document.getElementById('exp-conn-warn');
   if (warn) warn.style.display = (odIsConnected() && isOnline()) ? 'none' : 'block';
   const off = (fso.header.officialNo || '').trim();
+  document.getElementById('exp-official-card').style.display = FEATURES.officialNo ? '' : 'none';
   document.getElementById('exp-official-ok').style.display = off ? 'block' : 'none';
   document.getElementById('exp-official-missing').style.display = off ? 'none' : 'block';
   if (off) document.getElementById('exp-official-no').textContent = off;
@@ -3487,9 +3590,9 @@ async function doExport() {
   fso.attachments.forEach(a => { const chk = document.getElementById('att-chk-' + a.id); if (chk) a.includeInExport = chk.checked; });
   saveFsoData(fso);
 
-  // HARD GATE — no export, ever, without the official SharePoint FSO number.
-  // The wrong number on a signed FSO causes real admin mix-ups, so there is no "send anyway".
-  if (!(fso.header.officialNo || '').trim()) {
+  // HARD GATE (switched off in v2.12.0 — FEATURES.officialNo): no export without
+  // the official SharePoint FSO number. The app's own number is now the number of record.
+  if (officialNoMissing(fso)) {
     alert('Export blocked — no official FSO number.\n\nRegister the job on SharePoint, paste the number it issues into FSO Details → Official FSO No., then export.');
     return;
   }
@@ -3539,7 +3642,7 @@ async function doExport() {
     if (wantPdf) {
       try {
         toast('Building PDF…');
-        const pdf = await odMakeFsoPdf(fso);
+        const pdf = await ensureFsoPdf(fso);
         pdfBytes = pdf.bytes;
         downloadBlob(pdfBytes, pdf.name, 'application/pdf');
         addHistory(fso, 'PDF exported: ' + pdf.name);
@@ -3697,9 +3800,13 @@ async function generateXLSXFilled(fso) {
   const book = APP.books[fso.bookId];
   const h = fso.header;
   const cust = (APP.customers || []).find(c => c.id === h.customerId);
-  const t = calcTotals(fso);
+  const t = calcTotalsFx(fso);
+  const fxr = t.fxRate, cur = fsoCur(fso).code;
 
   const files = fflate.unzipSync(Uint8Array.from(atob(TEMPLATE_XLSX_B64), c => c.charCodeAt(0)));
+  if (cur !== 'ZAR' && files['xl/styles.xml']) {
+    files['xl/styles.xml'] = new TextEncoder().encode(fxStyleXml(new TextDecoder().decode(files['xl/styles.xml']), cur));
+  }
   const dec = new TextDecoder(), enc = new TextEncoder();
   let xml = dec.decode(files['xl/worksheets/sheet1.xml']);
   const S = (ref, v) => { xml = xlSet(xml, ref, v, false); };
@@ -3715,7 +3822,7 @@ async function generateXLSXFilled(fso) {
   S('X13', ddmmyyyy(h.date));
   S('AI13', h.time);
   S('AM13', h.jobType === 'INTERNAL' ? 'INTERNAL' : 'EXTERNAL');
-  S('F15', h.customer || (cust && cust.name) || '');
+  S('F15', fsoCustLabel(fso) || h.customer || (cust && cust.name) || '');
   // Street / city / province / country each get their own line. Accepts either
   // real line breaks or a comma-separated address (how it arrives from import).
   const addr = splitAddressLines(h.addressSite);
@@ -3733,17 +3840,19 @@ async function generateXLSXFilled(fso) {
     if (parseFloat(d.ntHours)) N('R' + r, parseFloat(d.ntHours));
     if (parseFloat(d.ot15Hours)) N('T' + r, parseFloat(d.ot15Hours));
     if (parseFloat(d.ot20Hours)) N('V' + r, parseFloat(d.ot20Hours));
-    const md = (d.materials || []).map(m => m.description).filter(Boolean).join(', ');
-    if (md) S('AD' + r, md);
-    const mv = (d.materials || []).reduce((s, m) => s + (parseFloat(m.totalSelling) || 0), 0);
-    if (mv) N('AM' + r, mv);
   });
+  // Materials are per FSO: one item per row (name × qty, line total)
+  materialSheetRows(fso).forEach((m, i) => {
+    if (m.text) S('AD' + (25 + i), m.text);
+    if (m.value) N('AM' + (25 + i), Math.round(m.value * fxr * 100) / 100);
+  });
+  if (cur !== 'ZAR') { S('AM24', CURRENCIES[cur].sym + ' c'); S('R60', cur); }
   if (t.totalMaterials) N('AM40', t.totalMaterials);
   if (h.description) S('A43', h.description);
 
   // Accommodation + signature name
-  if (parseFloat(fso.nights)) N('I68', parseFloat(fso.nights));
-  if (parseFloat(fso.accommodation)) N('M68', parseFloat(fso.accommodation));
+  if (fsoHasAcc(fso) && parseFloat(fso.nights)) N('I68', parseFloat(fso.nights));
+  if (fsoHasAcc(fso) && parseFloat(fso.accommodation)) N('M68', Math.round(parseFloat(fso.accommodation) * fxr * 100) / 100);
   const engNm = (book.config.engineerName || '');
   S('X19', engNm);
   S('AE70', engNm);
@@ -3774,7 +3883,7 @@ async function generateXLSXFilled(fso) {
   const sheetSub = isQuote(fso) ? (t.subtotal || 0)
     : (t.engTime + t.kmVal + t.ot15val + t.ot20val + t.totalMaterials + t.accVal);
   const sheetVat = isQuote(fso) ? (t.vatAmt || 0)
-    : ((h.jobType === 'INTERNAL') ? 0 : sheetSub * ((rt.vatPercent === undefined ? 15 : rt.vatPercent) / 100));
+    : ((h.jobType === 'INTERNAL' || fxNoVat(fso)) ? 0 : sheetSub * ((rt.vatPercent === undefined ? 15 : rt.vatPercent) / 100));
   N('R70', rnd(sheetSub)); N('I70', rnd(sheetVat)); N('R71', rnd(sheetVat)); N('R72', rnd(sheetSub + sheetVat));
 
   files['xl/worksheets/sheet1.xml'] = enc.encode(xml);
@@ -3879,7 +3988,7 @@ function syncStateBadge(fso) {
 async function createOrUpdateJob() {
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
-  if (!(fso.header.officialNo || '').trim()) {
+  if (officialNoMissing(fso)) {
     alert('No official FSO number yet.\n\nRegister the job on SharePoint first, then paste the number into FSO Details.');
     return;
   }
@@ -3887,9 +3996,7 @@ async function createOrUpdateJob() {
   toast('Building job documents…');
   try {
     lockRatesForExport(fso);
-    const pdf = await odMakeFsoPdf(fso);
-    fso.docsBuiltAt = Date.now();
-    addHistory(fso, 'Job documents created/updated: ' + pdf.name);
+    const pdf = await ensureFsoPdf(fso);
     saveFsoData(fso);
     syncBook(fso.bookId).catch(e => logError('syncBook', e));
     // Show the PDF straight away.
@@ -3952,7 +4059,8 @@ async function sendAdminEmails() {
 // Shared sender: builds (or rebuilds) the PDF, attaches it plus any ticked
 // attachments, and sends from the engineer's own mailbox.
 async function sendFsoEmail(fso, to, cc, kind) {
-  if (!(fso.header.officialNo || '').trim()) { alert('Enter the official FSO number first.'); return; }
+  if (officialNoMissing(fso)) { alert('Enter the official FSO number first.'); return; }
+  { const fx = fsoFx(fso); if (fx.foreign && !fx.ok) { alert('No ' + fx.code + ' exchange rate captured yet — tap Update rate on the FSO page first.'); return; } }
   if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
   const looksOk = a => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a);
   const bad = to.concat(cc).filter(a => !looksOk(a));
@@ -3962,8 +4070,7 @@ async function sendFsoEmail(fso, to, cc, kind) {
   try {
     lockRatesForExport(fso);
     toast('Building PDF…');
-    const pdf = await odMakeFsoPdf(fso);
-    fso.docsBuiltAt = Date.now();
+    const pdf = await ensureFsoPdf(fso);
     toast('Sending…');
     await odEmailFso(fso, to, pdf.bytes, cc, kind);
     addHistory(fso, (kind === 'admin' ? 'Admin' : 'Customer') + ' email sent to ' + to.join(', ') +
@@ -4005,8 +4112,8 @@ async function sendToCompanySystem() {
   const fso = getFso(ctx.fsoId, ctx.bookId);
   if (!fso) return;
   const sp = spCfg();
-  const jobNo = (fso.header.officialNo || '').trim();
-  if (!jobNo) {
+  const jobNo = (fso.header.officialNo || '').trim() || fso.fsoNumber;
+  if (officialNoMissing(fso)) {
     alert('No official FSO number yet.\n\nRegister the job on SharePoint first and paste the number into FSO Details.');
     return;
   }
@@ -4027,7 +4134,7 @@ async function sendToCompanySystem() {
     // reaching Admin — fall back to the workbook so the email always goes.
     let att, pdf = null;
     try {
-      pdf = await odMakeFsoPdf(fso);
+      pdf = await ensureFsoPdf(fso);
       att = { '@odata.type': '#microsoft.graph.fileAttachment', name: pdf.name,
               contentType: 'application/pdf', contentBytes: u8ToB64(pdf.bytes) };
     } catch (e) {
@@ -4215,6 +4322,11 @@ function migrateData() {
   APP.customers.forEach(c => { if (!Array.isArray(c.contacts)) c.contacts = []; if (!Array.isArray(c.boilers)) c.boilers = []; });
   if (!Array.isArray(APP.departments)) APP.departments = [];
   Object.values(APP.books || {}).forEach(b => {
+    // v2.11.0: materials move from days to the FSO; accommodation becomes opt-in
+    Object.values(b.fsos || {}).forEach(f => {
+      migrateFsoMaterials(f);
+      if (f.hasAccommodation === undefined) f.hasAccommodation = fsoHasAcc(f);
+    });
     if (b.active === undefined) b.active = true;
     // Migrate flat rates → external/internal rate sets
     const r = (b.config && b.config.rates) || {};
@@ -4463,7 +4575,7 @@ function deleteNote() {
 // ============================================================
 function renderCustomers() {
   const el = document.getElementById('customers-list');
-  const list = (APP.customers || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const list = sortedCustomers();
   if (!list.length) {
     el.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>No customers yet — tap + to add one</p></div>';
     return;
@@ -4472,7 +4584,7 @@ function renderCustomers() {
     '<div class="list-item" onclick="openCustomer(&#39;' + c.id + '&#39;)">' +
       '<div class="icon-circle" style="background:var(--blue-light)">🏢</div>' +
       '<div class="list-item-main">' +
-        '<div class="list-item-title">' + esc(c.name || 'Unnamed') + '</div>' +
+        '<div class="list-item-title">' + esc(custLabel(c)) + '</div>' +
         '<div class="list-item-sub">' + esc((c.address || '').replace(/\n/g, ', ') || 'No address') + '</div>' +
       '</div><div style="color:var(--grey)">›</div></div>'
   ).join('');
@@ -4594,6 +4706,8 @@ function mergeImportedCustomers(rows) {
       // update — only overwrite when the cell has a value
       c.name = name;
       if (address)   c.address = address;
+      if (city)      c.city = city;
+      if (country)   c.country = country;
       if (vatNo)     c.vatNo = vatNo;
       if (accountNo) c.accountNo = accountNo;
       if (isFinite(km)) c.defaultKm = km;
@@ -4631,6 +4745,9 @@ function renderCustomerEdit() {
   document.getElementById('cust-edit-title').textContent = c.name || 'Customer';
   document.getElementById('cust-name').value = c.name || '';
   document.getElementById('cust-address').value = c.address || '';
+  document.getElementById('cust-city').value = custCity(c);
+  document.getElementById('cust-country').value = custCountry(c);
+  custLabelPreview();
   document.getElementById('cust-vat').value = c.vatNo || '';
   document.getElementById('cust-account').value = c.accountNo || '';
   document.getElementById('cust-km').value = c.defaultKm || '';
@@ -4675,6 +4792,12 @@ function renderCustomerContacts() {
     '</div>'
   ).join('');
 }
+function custLabelPreview() {
+  const el = document.getElementById('cust-label-preview');
+  if (!el) return;
+  el.textContent = custLabel({ name: document.getElementById('cust-name').value || 'Customer',
+    city: document.getElementById('cust-city').value.trim(), country: document.getElementById('cust-country').value.trim(), address: '' });
+}
 function addCustomerContact() { custContacts.push({ name: '', email: '', phone: '' }); renderCustomerContacts(); }
 function removeCustomerContact(i) { custContacts.splice(i, 1); renderCustomerContacts(); }
 
@@ -4705,6 +4828,8 @@ function saveCustomer() {
   if (!c) { goBack(); return; }
   c.name = document.getElementById('cust-name').value.trim();
   c.address = document.getElementById('cust-address').value.trim();
+  c.city = document.getElementById('cust-city').value.trim();
+  c.country = document.getElementById('cust-country').value.trim();
   c.vatNo = document.getElementById('cust-vat').value.trim();
   c.accountNo = document.getElementById('cust-account').value.trim();
   c.defaultKm = parseFloat(document.getElementById('cust-km').value) || 0;
@@ -4817,6 +4942,8 @@ function renderSettingsSharePoint() {
   const sp = spCfg();
   document.getElementById('sp-register-url').value = sp.registerUrl || '';
   document.getElementById('sp-upload-toggle').checked = !!sp.uploadEnabled;
+  document.getElementById('sp-register-card').style.display = FEATURES.officialNo ? '' : 'none';
+  document.getElementById('sp-upload-card').style.display = FEATURES.spJobFolder ? '' : 'none';
   document.getElementById('sp-admin-name').value = sp.adminName || 'Loriza';
   document.getElementById('sp-admin-email').value = sp.adminEmail || '';
   document.getElementById('sp-manager-email').value = sp.managerEmail || '';
@@ -4890,6 +5017,671 @@ function openSpFolder() {
 }
 
 // ============================================================
+// v2.12.0 — FSO numbering, Create vs Print PDF / Update, currency
+// ============================================================
+// Switched-off features (code kept; flip to true to bring them back):
+//  - officialNo:  the "Official FSO No. (SharePoint)" field + hard export block.
+//                 OFF: the app's own FSO number is the number of record.
+//  - spJobFolder: per-FSO SharePoint job folder link + upload of exports to it.
+const FEATURES = { officialNo: false, spJobFolder: false };
+function officialNoMissing(fso) { return FEATURES.officialNo && !((fso.header.officialNo || '').trim()); }
+
+// ---- Currency -------------------------------------------------------------
+// All amounts are captured in ZAR. An FSO can be printed in USD or GBP at a
+// rate captured when the FSO was created (or when "Update rate" is tapped).
+const CURRENCIES = { ZAR: { sym: 'R', name: 'Rand' }, USD: { sym: '$', name: 'US dollar' }, GBP: { sym: '£', name: 'Pound sterling' } };
+const FX_URL = 'https://open.er-api.com/v6/latest/ZAR';   // free, no account (ExchangeRate-API)
+function fsoCur(fso) {
+  if (!fso.currency || !CURRENCIES[fso.currency.code]) fso.currency = { code: 'ZAR', rate: 1, at: '', source: '', addVat: false };
+  return fso.currency;
+}
+function fsoFx(fso) {
+  const c = fsoCur(fso);
+  if (c.code === 'ZAR') return { code: 'ZAR', rate: 1, ok: true, foreign: false };
+  const r = parseFloat(c.rate);
+  return { code: c.code, rate: r > 0 ? r : 0, ok: r > 0, foreign: true };
+}
+function fxNoVat(fso) { const c = fsoCur(fso); return c.code !== 'ZAR' && !c.addVat; }
+function fmtMoney(code, n) {
+  const sym = (CURRENCIES[code] || CURRENCIES.ZAR).sym;
+  return sym + ' ' + (n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtFso(fso, zarAmount) {
+  const fx = fsoFx(fso);
+  if (!fx.foreign) return fmtR(zarAmount);
+  return fx.ok ? fmtMoney(fx.code, (zarAmount || 0) * fx.rate) : fmtR(zarAmount) + ' (no ' + fx.code + ' rate)';
+}
+// Totals in the FSO's currency (calcTotals stays in ZAR).
+function calcTotalsFx(fso) {
+  const t = calcTotals(fso), fx = fsoFx(fso), r = fx.ok ? fx.rate : 1;
+  const c = v => Math.round(((v || 0) * r + Number.EPSILON) * 100) / 100;
+  const out = Object.assign({}, t);
+  ['engTime', 'ot15val', 'ot20val', 'kmVal', 'accVal', 'coVal', 'totalMaterials', 'subtotal', 'vatAmt', 'total'].forEach(k => out[k] = c(t[k]));
+  out.rates = Object.assign({}, t.rates, { nt: c(t.rates.nt), ot15: c(t.rates.ot15), ot20: c(t.rates.ot20), kmRate: c(t.rates.kmRate), callOutRate: c(t.rates.callOutRate) });
+  out.fx = fx; out.fxRate = r;
+  return out;
+}
+async function fetchZarRate(code) {
+  const res = await fetch(FX_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error('rate service answered ' + res.status);
+  const j = await res.json();
+  const r = j && j.rates && parseFloat(j.rates[code]);
+  if (!(r > 0 && r < 10)) throw new Error('no ' + code + ' rate in the answer');
+  return { rate: r, at: new Date().toISOString(), published: j.time_last_update_utc || '' };
+}
+async function updateFsoRate(silent) {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const c = fsoCur(fso);
+  if (c.code === 'ZAR') { if (!silent) toast('This FSO is in ZAR — no rate needed'); return; }
+  if (!isOnline()) { toast('Offline — the ' + c.code + ' rate will be captured when you tap Update rate with signal'); return; }
+  try {
+    const r = await fetchZarRate(c.code);
+    const old = c.rate;
+    c.rate = r.rate; c.at = r.at; c.source = 'ExchangeRate-API' + (r.published ? ' (' + r.published + ')' : '');
+    addHistory(fso, 'Exchange rate ' + (old ? 'updated' : 'captured') + ': 1 ' + c.code + ' = R ' + (1 / r.rate).toFixed(4));
+    saveFsoData(fso);
+    toast('Rate captured: 1 ' + c.code + ' = R ' + (1 / r.rate).toFixed(2));
+  } catch (e) { toast('Could not get the rate: ' + (e.message || e)); }
+  if (document.getElementById('screen-fso-edit').classList.contains('active')) renderFsoEdit();
+}
+async function setFsoCurrency(code) {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso || !CURRENCIES[code]) return;
+  const c = fsoCur(fso);
+  if (c.code === code) return;
+  c.code = code;
+  c.rate = code === 'ZAR' ? 1 : 0; c.at = ''; c.source = '';
+  c.addVat = false;
+  addHistory(fso, 'Currency set to ' + code + (code === 'ZAR' ? '' : ' (VAT excluded)'));
+  saveFsoData(fso);
+  if (code !== 'ZAR') await updateFsoRate(true);
+  renderFsoEdit();
+}
+// Manual override, entered the natural way: "1 USD = R 17.85"
+function overrideFsoRate() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const c = fsoCur(fso);
+  if (c.code === 'ZAR') return;
+  const cur = c.rate ? (1 / c.rate).toFixed(4) : '';
+  const v = prompt('Override the exchange rate.\n\nHow many Rand is 1 ' + c.code + '?', cur);
+  if (v === null) return;
+  const zarPer = parseFloat(String(v).replace(',', '.').replace(/[^0-9.]/g, ''));
+  if (!(zarPer > 0.01 && zarPer < 1000)) { toast('Enter the Rand value of 1 ' + c.code + ', e.g. 17.85'); return; }
+  c.rate = 1 / zarPer; c.at = new Date().toISOString(); c.source = 'manual override';
+  addHistory(fso, 'Exchange rate overridden: 1 ' + c.code + ' = R ' + zarPer.toFixed(4));
+  saveFsoData(fso);
+  renderFsoEdit();
+}
+function toggleFxVat() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  const c = fsoCur(fso);
+  c.addVat = !c.addVat;
+  addHistory(fso, 'VAT ' + (c.addVat ? 'added to' : 'removed from') + ' ' + c.code + ' FSO');
+  saveFsoData(fso);
+  renderFsoEdit();
+}
+function currencyCardHtml(fso, isArchived) {
+  const c = fsoCur(fso), fx = fsoFx(fso);
+  let h = '<div class="card"><div class="card-header"><div class="card-title">Currency</div>';
+  if (!isArchived) {
+    h += '<div style="display:flex;gap:4px">' + Object.keys(CURRENCIES).map(k =>
+      '<button class="btn btn-sm ' + (c.code === k ? 'btn-primary' : 'btn-secondary') + '" style="width:auto;padding:0 12px" onclick="setFsoCurrency(&#39;' + k + '&#39;)">' + k + '</button>').join('') + '</div>';
+  } else h += '<span class="chip chip-grey">' + c.code + '</span>';
+  h += '</div>';
+  if (!fx.foreign) {
+    h += '<div style="font-size:.8rem;color:var(--grey)">Printed in Rand.</div>';
+  } else {
+    h += fx.ok
+      ? '<div style="font-size:.9rem;font-weight:600">1 ' + c.code + ' = R ' + (1 / fx.rate).toFixed(4) + '</div>' +
+        '<div style="font-size:.74rem;color:var(--grey);margin-top:2px">' + (c.source === 'manual override' ? 'Manual override' : 'Captured') +
+        (c.at ? ' ' + esc(fmtHistTs(c.at)) : '') + (c.source && c.source !== 'manual override' ? ' · ' + esc(c.source) : '') + '</div>'
+      : '<div style="padding:8px 10px;border-radius:8px;background:var(--orange-light);color:var(--orange);font-size:.8rem">No ' + c.code + ' rate captured yet — tap Update rate when you have signal. Printing is blocked until then.</div>';
+    h += '<div style="font-size:.74rem;color:var(--grey);margin-top:6px">All amounts are entered in Rand and printed in ' + c.code + ' at this rate. The rate only changes when you tap Update rate or Override.</div>';
+    if (!isArchived) {
+      h += '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button class="btn btn-secondary btn-sm" style="flex:1" onclick="updateFsoRate()">⟳ Update rate</button>' +
+        '<button class="btn btn-secondary btn-sm" style="flex:1" onclick="overrideFsoRate()">✎ Override</button></div>';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">' +
+        '<div style="font-size:.85rem">' + (c.addVat ? 'VAT added' : 'VAT excluded (export)') + '</div>' +
+        '<button class="btn btn-secondary btn-sm" style="width:auto" onclick="toggleFxVat()">' + (c.addVat ? 'Remove VAT' : '+ Add VAT') + '</button></div>';
+    }
+  }
+  return h + '</div>';
+}
+// Swap the Rand number formats / headings of the FSO template for USD or GBP.
+function fxStyleXml(stylesXml, code) {
+  if (code === 'ZAR') return stylesXml;
+  const sym = CURRENCIES[code].sym;
+  const lcid = code === 'USD' ? '409' : '809';
+  // Function replacers: a "$" in a replacement STRING is a special pattern ("$&", "$$").
+  return stylesXml
+    .replace(/\[\$R-1C09\]/g, () => '[$' + sym + '-' + lcid + ']')
+    .replace(/&quot;R&quot;/g, () => '&quot;' + sym + '&quot;');
+}
+function fxNumberFormat(code) {
+  const sym = CURRENCIES[code].sym;
+  return '_-"' + sym + '"* #,##0.00_-;\\-"' + sym + '"* #,##0.00_-;_-"' + sym + '"* "-"??_-;_-@_-';
+}
+
+// ---- New FSO: accommodation + currency in one step --------------------------
+function askNewFso(fsoNumber) {
+  return new Promise(resolve => {
+    const ov = document.getElementById('choice-overlay');
+    document.getElementById('choice-title').textContent = 'New FSO ' + fsoNumber;
+    document.getElementById('choice-text').textContent = 'You can change both later on the FSO page.';
+    const st = { acc: 'no', cur: 'ZAR' };
+    const box = document.getElementById('choice-buttons');
+    const seg = (key, opts, label) => '<div style="font-size:.78rem;font-weight:600;color:var(--grey);margin:12px 0 6px">' + label + '</div>' +
+      '<div style="display:flex;gap:6px">' + opts.map(([v, l]) =>
+        '<button class="btn btn-sm btn-secondary" data-k="' + key + '" data-v="' + v + '" style="flex:1">' + l + '</button>').join('') + '</div>';
+    box.innerHTML = seg('acc', [['yes', 'Yes'], ['no', 'No']], 'Is accommodation part of this FSO?') +
+      seg('cur', [['ZAR', 'ZAR'], ['USD', 'USD'], ['GBP', 'GBP']], 'Currency') +
+      '<div id="nf-cur-note" style="font-size:.72rem;color:var(--grey);margin-top:6px;min-height:1em"></div>' +
+      '<button class="btn btn-primary" id="nf-go" style="margin-top:12px">Create FSO</button>';
+    const paint = () => box.querySelectorAll('button[data-k]').forEach(b => {
+      b.className = 'btn btn-sm ' + (st[b.dataset.k] === b.dataset.v ? 'btn-primary' : 'btn-secondary');
+    });
+    box.querySelectorAll('button[data-k]').forEach(b => b.onclick = () => {
+      st[b.dataset.k] = b.dataset.v; paint();
+      document.getElementById('nf-cur-note').textContent = st.cur === 'ZAR' ? '' :
+        (isOnline() ? 'The ' + st.cur + ' rate is captured now. VAT is excluded (you can add it).' : 'Offline: the ' + st.cur + ' rate is captured later — printing waits for it.');
+    });
+    paint();
+    document.getElementById('nf-go').onclick = () => { ov.classList.remove('show'); resolve(st); };
+    ov._cancel = () => { ov.classList.remove('show'); resolve(null); };
+    ov.classList.add('show');
+  });
+}
+
+// ---- PDF revisions: only when something changed -----------------------------
+async function sha16(str) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(d)).slice(0, 12).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// Everything that is printed, EXCEPT the signatures.
+async function fsoDataHash(fso) {
+  const t = calcTotalsFx(fso), h = fso.header, book = APP.books[fso.bookId];
+  const pick = Object.assign({}, h); delete pick._defaultKm; delete pick.folderDesc;
+  return sha16(JSON.stringify({
+    h: pick, label: fsoCustLabel(fso), mode: fso.jobMode, q: isQuote(fso) ? fso.quote : null,
+    days: (fso.days || []).map(d => [d.date, d.km, d.workDone, d.ntHours, d.ot15Hours, d.ot20Hours]),
+    mats: materialSheetRows(fso), acc: fsoHasAcc(fso) ? [fso.accommodation, fso.nights] : null,
+    rates: t.rates, totals: [t.subtotal, t.vatAmt, t.total], cur: [fsoCur(fso).code, t.fxRate, fsoCur(fso).addVat],
+    eng: book && [book.config.engineerName, book.config.engineerContact]
+  }));
+}
+async function fsoSigHashes(fso) {
+  const s = fso.signatures || {};
+  return {
+    eng: s.engineer ? await sha16('e' + s.engineer) : '',
+    cust: s.customer ? await sha16('c' + s.customer + '|' + (s.customerName || '') + '|' + (s.customerSignDate || '')) : ''
+  };
+}
+const pdfCacheKey = fso => 'pdf-' + fso.bookId + '-' + fso.fsoNumber;
+function u8FromB64(b64) { const bin = atob(b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return u8; }
+async function cachePdf(fso, bytes) { try { await idbPut(pdfCacheKey(fso), u8ToB64(bytes)); } catch (e) { console.warn('pdf cache', e); } }
+async function cachedPdf(fso) { try { const b = await idbGet(pdfCacheKey(fso)); return b ? u8FromB64(b) : null; } catch (e) { return null; } }
+
+// The single place a FSO PDF is made. Rules:
+//  - nothing printed changed and no signatures changed  -> reuse the last PDF
+//  - only signatures ADDED to a PDF that wasn't fully signed -> overwrite that PDF (same name)
+//  - anything else -> next revision ("… FSO Rev N.pdf"); a fully signed PDF is never overwritten
+async function ensureFsoPdf(fso, opts) {
+  opts = opts || {};
+  const fx = fsoFx(fso);
+  if (fx.foreign && !fx.ok) throw new Error('No ' + fx.code + ' exchange rate captured yet — tap Update rate on the FSO page with signal');
+  const dataHash = await fsoDataHash(fso);
+  const sig = await fsoSigHashes(fso);
+  const last = fso.pdfLast || null;
+  const title = fsoDocTitle(fso);
+  const sameData = last && last.title === title && last.dataHash === dataHash;
+  const sameSigs = last && last.sigEng === sig.eng && last.sigCust === sig.cust;
+  if (sameData && sameSigs) {
+    const bytes = (await cachedPdf(fso)) || await odDownloadPdf(fso, last.name);
+    if (bytes) return { bytes, name: last.name, reused: true };
+  }
+  const folderId = await odFsoJobFolder(fso);
+  const xlsxName = title + ' FSO.xlsx';
+  const xlsxBytes = await generateXLSXFilled(fso);
+  const item = await odPutFile(folderId, xlsxName, xlsxBytes, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  const pdfBytes = await odConvertToPdf(item.id, xlsxName);
+  const lastFullySigned = last && last.sigEng && last.sigCust;
+  const onlySigsAdded = sameData && !lastFullySigned &&
+    (!last.sigEng || last.sigEng === sig.eng) && (!last.sigCust || last.sigCust === sig.cust);
+  let pdfName, how;
+  if (onlySigsAdded) { pdfName = last.name; how = 'signatures added — unsigned PDF replaced'; }
+  else {
+    pdfName = await odNextPdfName(folderId, title + ' FSO');
+    how = !last ? 'first PDF' : (sameData ? 'signatures changed on a signed PDF — new revision' : 'data changed — new revision');
+  }
+  await odPutFile(folderId, pdfName, pdfBytes, 'application/pdf');
+  try { await uploadReceipts(fso, folderId); } catch (e) { console.warn('receipts', e); }
+  fso.pdfLast = { name: pdfName, title, dataHash, sigEng: sig.eng, sigCust: sig.cust, at: Date.now() };
+  fso.docsBuiltAt = Date.now();
+  addHistory(fso, 'PDF ' + pdfName + ' (' + how + ')');
+  await cachePdf(fso, pdfBytes);
+  if (FEATURES.spJobFolder) {
+    try { await spUploadExport(fso, pdfName, pdfBytes, xlsxName, xlsxBytes); }
+    catch (e) { console.warn('sharepoint upload', e); toast('SharePoint upload failed (OneDrive copy saved): ' + (e.message || e)); }
+  }
+  return { bytes: pdfBytes, name: pdfName, reused: false, how };
+}
+async function odDownloadPdf(fso, name) {
+  if (!odIsConnected() || !isOnline()) return null;
+  try {
+    const folderId = await odFsoJobFolder(fso);
+    const bytes = await gFetch('GET', '/me/drive/items/' + folderId + ':/' + encodeURIComponent(name) + ':/content', { raw: true, quiet: true });
+    if (bytes && bytes.length) { await cachePdf(fso, bytes); return bytes; }
+  } catch (e) { console.warn('download pdf', e); }
+  return null;
+}
+// Newest PDF in the job folder (for FSOs printed before v2.12.0)
+async function odLatestPdfName(fso) {
+  const folderId = await odFsoJobFolder(fso);
+  const base = fsoDocTitle(fso) + ' FSO';
+  const kids = await gFetch('GET', '/me/drive/items/' + folderId + '/children?$select=name&$top=200');
+  const names = (kids.value || []).map(k => k.name);
+  let best = names.includes(base + '.pdf') ? base + '.pdf' : null, rev = 0;
+  names.forEach(n => { const m = n.startsWith(base + ' Rev ') && /Rev (\d+)\.pdf$/.exec(n); if (m && +m[1] > rev) { rev = +m[1]; best = n; } });
+  return best;
+}
+
+// ---- Buttons on the FSO page -------------------------------------------------
+async function createJobOnly() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (officialNoMissing(fso)) { alert('No official FSO number yet.'); return; }
+  if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
+  toast('Creating job folder and sheet…');
+  try {
+    const folderId = await odFsoJobFolder(fso);
+    const xlsxName = fsoDocTitle(fso) + ' FSO.xlsx';
+    await odPutFile(folderId, xlsxName, await generateXLSXFilled(fso), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    try { await uploadReceipts(fso, folderId); } catch (e) { console.warn('receipts', e); }
+    try { const meta = await gFetch('GET', '/me/drive/items/' + folderId + '?$select=webUrl'); if (meta && meta.webUrl) fso.jobFolderUrl = meta.webUrl; } catch (e) {}
+    fso.jobCreatedAt = Date.now();
+    addHistory(fso, 'Job created in OneDrive: ' + xlsxName);
+    saveFsoData(fso);
+    syncBook(fso.bookId).catch(e => logError('syncBook', e));
+    toast('Job created in OneDrive');
+    renderFsoEdit();
+  } catch (e) { logError('createJobOnly', e); toast('Create failed: ' + (e.message || e)); }
+}
+async function printPdfUpdate() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  if (officialNoMissing(fso)) { alert('No official FSO number yet.'); return; }
+  const fx = fsoFx(fso);
+  if (fx.foreign && !fx.ok) { alert('No ' + fx.code + ' exchange rate captured yet.\n\nTap "Update rate" in the Currency card when you have signal, then print.'); return; }
+  if (!odIsConnected() || !isOnline()) { toast('Needs OneDrive + internet'); return; }
+  toast('Updating sheet and printing PDF…');
+  try {
+    lockRatesForExport(fso);
+    const pdf = await ensureFsoPdf(fso);
+    saveFsoData(fso);
+    syncBook(fso.bookId).catch(e => logError('syncBook', e));
+    toast(pdf.reused ? 'Nothing changed — showing ' + pdf.name : 'Saved ' + pdf.name);
+    showPdfBytes(pdf.bytes);
+    renderFsoEdit();
+  } catch (e) { logError('printPdfUpdate', e); toast('Print failed: ' + (e.message || e)); }
+}
+function showPdfBytes(bytes) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = URL.createObjectURL(blob);
+  document.getElementById('preview-frame').src = previewUrl;
+  document.getElementById('preview-overlay').classList.add('show');
+}
+async function latestPdfBytes(fso) {
+  if (fso.pdfLast) {
+    const b = (await cachedPdf(fso)) || await odDownloadPdf(fso, fso.pdfLast.name);
+    if (b) return { bytes: b, name: fso.pdfLast.name };
+  }
+  if (!odIsConnected() || !isOnline()) return null;
+  const name = await odLatestPdfName(fso);
+  if (!name) return null;
+  const b = await odDownloadPdf(fso, name);
+  return b ? { bytes: b, name } : null;
+}
+async function previewLatestPdf() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  toast('Opening latest PDF…');
+  try {
+    const p = await latestPdfBytes(fso);
+    if (!p) { toast(isOnline() ? 'No PDF printed for this FSO yet' : 'Offline and no copy of the PDF on this device'); return; }
+    showPdfBytes(p.bytes);
+  } catch (e) { toast('Could not open the PDF: ' + (e.message || e)); }
+}
+async function sharePdf() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  try {
+    const p = await latestPdfBytes(fso);
+    if (!p) { toast('Print the PDF first'); return; }
+    const file = new File([p.bytes], p.name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: p.name.replace(/\.pdf$/, ''), text: 'Field Service Order ' + fso.fsoNumber });
+      addHistory(fso, 'PDF shared: ' + p.name); saveFsoData(fso);
+      return;
+    }
+    downloadBlob(p.bytes, p.name, 'application/pdf');
+    toast('This device cannot share files from the app — the PDF was downloaded instead');
+  } catch (e) { if (!e || e.name !== 'AbortError') toast('Share failed: ' + (e.message || e)); }
+}
+function pdfStateBadge(fso) {
+  const last = fso.pdfLast;
+  let colour, text;
+  if (!last && !fso.docsBuiltAt) { colour = 'grey'; text = fso.jobCreatedAt ? 'Job created · no PDF yet' : 'Not created in OneDrive yet'; }
+  else if ((fso.modifiedAt || 0) > (fso.docsBuiltAt || 0)) { colour = 'orange'; text = 'Changed since ' + (last ? last.name : 'last PDF') + ' — Print PDF / Update'; }
+  else { colour = 'green'; text = 'Up to date · ' + (last ? last.name : 'PDF printed'); }
+  return '<div style="padding:8px 10px;border-radius:10px;margin-bottom:10px;font-size:.8rem;background:var(--' + colour + '-light);color:var(--' + colour + ')">' +
+    (colour === 'green' ? '✓ ' : colour === 'orange' ? '● ' : '○ ') + esc(text) + '</div>';
+}
+
+// ---- Receipts: admin-only, uploaded to "<job folder>/Receipts" --------------
+async function uploadReceipts(fso, folderId) {
+  const recs = (fso.attachments || []).filter(a => a.receipt);
+  if (!recs.length) return 0;
+  const title = fsoDocTitle(fso);
+  const todo = recs.filter(a => a.uploadedTitle !== title);
+  if (!todo.length) return 0;
+  const sub = await odEnsureChildFolder(folderId, 'Receipts');
+  let n = 0;
+  for (const a of todo) {
+    try {
+      const b64 = await attGetB64(a);
+      if (!b64) continue;
+      await odPutFile(sub, a.name, u8FromB64(b64), a.mimeType || 'image/jpeg');
+      a.uploadedTitle = title; n++;
+    } catch (e) { console.warn('receipt upload', a.name, e); }
+  }
+  if (n) addHistory(fso, n + ' receipt photo(s) uploaded to the job folder (Receipts)');
+  return n;
+}
+
+// ============================================================
+// v2.11.0 — customer labels, FSO-level materials, accommodation choice,
+// Boiler & More, RFP / Open Job / Google Maps buttons
+// ============================================================
+const SA_NAMES = /^(south africa|republic of south africa|rsa|za|s\.?\s?a\.?)$/i;
+function custAddrLines(c) { return String((c && c.address) || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean); }
+// City / country: explicit fields win; otherwise read them from a full
+// 4-line imported address (Street / City / Province / Country).
+function custCity(c) {
+  if (!c) return '';
+  if (c.city) return c.city;
+  const l = custAddrLines(c);
+  return l.length === 4 ? l[1] : '';
+}
+function custCountry(c) {
+  if (!c) return '';
+  if (c.country) return c.country;
+  const l = custAddrLines(c);
+  return l.length === 4 ? l[3] : '';
+}
+function isLocalCountry(country) { return !String(country || '').trim() || SA_NAMES.test(String(country).trim()); }
+// "Southern Oil, Swellendam" locally; "JTI, Lilongwe, Malawi" for export customers.
+function custLabel(c) {
+  if (!c) return '';
+  const parts = [(c.name || 'Unnamed').trim()];
+  const city = custCity(c), country = custCountry(c);
+  if (city) parts.push(city);
+  if (!isLocalCountry(country)) parts.push(country.trim());
+  return parts.join(', ');
+}
+function sortedCustomers() {
+  return (APP.customers || []).slice().sort((a, b) =>
+    custLabel(a).localeCompare(custLabel(b), undefined, { sensitivity: 'base' }));
+}
+function fsoCustLabel(fso) {
+  const h = fso.header || {};
+  const c = (APP.customers || []).find(x => x.id === h.customerId);
+  return c ? custLabel(c) : (h.customerLabel || h.customer || '');
+}
+
+// ---- Accommodation is opt-in per FSO -------------------------------------
+function fsoHasAcc(fso) {
+  if (fso.hasAccommodation === undefined) return (parseFloat(fso.nights) || 0) > 0 || (parseFloat(fso.accommodation) || 0) > 0;
+  return !!fso.hasAccommodation;
+}
+
+// ---- Materials live on the FSO (no longer per day) -----------------------
+// Legacy day materials are folded in by migrateFsoMaterials(); this reader
+// still includes any that slipped through so nothing is ever dropped.
+function fsoMaterials(fso) {
+  const list = Array.isArray(fso.materials) ? fso.materials.slice() : [];
+  (fso.days || []).forEach(d => (d.materials || []).forEach(m => list.push(Object.assign({ date: d.date || '' }, m))));
+  return list;
+}
+function migrateFsoMaterials(fso) {
+  if (!Array.isArray(fso.materials)) fso.materials = [];
+  let moved = 0;
+  (fso.days || []).forEach(d => {
+    if (Array.isArray(d.materials) && d.materials.length) {
+      d.materials.forEach(m => { fso.materials.push(Object.assign({ date: d.date || '' }, m)); moved++; });
+    }
+    d.materials = [];
+  });
+  return moved;
+}
+// What the sheet prints: name × qty in AD, line total in AM (15 rows).
+function materialSheetRows(fso) {
+  const rows = fsoMaterials(fso).filter(m => (m.description || '').trim() || parseFloat(m.totalSelling))
+    .map(m => {
+      const q = parseFloat(m.qty) || 1;
+      return { text: (m.description || 'Material').trim() + (q !== 1 ? ' ×' + q : ''), value: parseFloat(m.totalSelling) || 0 };
+    });
+  if (rows.length <= 15) return rows;
+  const head = rows.slice(0, 14), rest = rows.slice(14);
+  head.push({ text: '+ ' + rest.length + ' more item(s)', value: rest.reduce((s, r) => s + r.value, 0) });
+  return head;
+}
+
+// ---- Materials screen ------------------------------------------------------
+function openMaterials() { goTo('screen-materials', { fsoId: ctx.fsoId, bookId: ctx.bookId }); }
+function renderMaterialsScreen() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) { goBack(); return; }
+  if (migrateFsoMaterials(fso)) saveFsoData(fso);
+  document.getElementById('materials-title').textContent = 'Materials · ' + fso.fsoNumber;
+  dfMaterials = JSON.parse(JSON.stringify(fso.materials || []));
+  renderDayMaterials();
+}
+function saveMaterials() {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) { goBack(); return; }
+  dfMaterials.forEach(m => { m.qty = parseFloat(m.qty) || 1; m.totalSelling = (parseFloat(m.sellingPrice) || 0) * m.qty; });
+  const before = JSON.stringify(fso.materials || []);
+  fso.materials = dfMaterials.filter(m => (m.description || '').trim() || parseFloat(m.costPrice) || parseFloat(m.sellingPrice) || m.receiptAttId);
+  if (JSON.stringify(fso.materials) !== before) {
+    addHistory(fso, 'Materials updated: ' + fso.materials.length + ' item(s), ' + fmtR(fso.materials.reduce((s, m) => s + (m.totalSelling || 0), 0)));
+    if (fso.status === 'open') fso.status = 'progress';
+    saveFsoData(fso);
+    toast('Materials saved');
+  }
+  goBack();
+}
+async function addMatReceipt(i, input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const m = dfMaterials[i];
+  if (!file || !fso || !m) return;
+  try {
+    const comp = await compressImageFile(file);
+    let b64, mime, bytes;
+    if (comp) { b64 = comp.b64; mime = comp.mime; bytes = Math.round(b64.length * 0.75); }
+    else {
+      b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = e => res(e.target.result.split(',')[1]); r.onerror = () => rej(new Error('Read failed')); r.readAsDataURL(file); });
+      mime = file.type || 'image/jpeg'; bytes = file.size;
+    }
+    if (m.receiptAttId) await removeReceiptAttachment(fso, m.receiptAttId);
+    const id = 'att-' + uid();
+    await idbPut(id, b64);
+    const safe = ((m.description || 'material').replace(/[^A-Za-z0-9 _-]+/g, '').trim().slice(0, 40) || 'material');
+    const ext = /png/.test(mime) ? 'png' : (/pdf/.test(mime) ? 'pdf' : 'jpg');
+    fso.attachments.push({ id, name: 'Receipt - ' + safe + '.' + ext, type: 'file', mimeType: mime,
+      sizeKb: Math.round(bytes / 1024), addedDate: todayStr(), includeInExport: true, stored: 'idb', receipt: true });
+    m.receiptAttId = id;
+    addHistory(fso, 'Receipt photo added for "' + (m.description || 'material') + '"');
+    saveFsoData(fso);
+    renderDayMaterials();
+    toast('Receipt saved');
+  } catch (e) { toast('Could not save receipt: ' + (e.message || e)); }
+}
+async function removeReceiptAttachment(fso, attId) {
+  fso.attachments = (fso.attachments || []).filter(a => a.id !== attId);
+  try { await idbDel(attId); } catch (e) {}
+}
+async function viewMatReceipt(i) {
+  const m = dfMaterials[i];
+  if (!m || !m.receiptAttId) return;
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  const att = fso && (fso.attachments || []).find(a => a.id === m.receiptAttId);
+  try {
+    const b64 = await idbGet(m.receiptAttId);
+    if (!b64) { toast('Receipt not found on this device'); return; }
+    const bin = atob(b64), u8 = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k);
+    const url = URL.createObjectURL(new Blob([u8], { type: (att && att.mimeType) || 'image/jpeg' }));
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { toast('Could not open receipt'); }
+}
+
+// ---- Accommodation choice (asked when an FSO is created) ------------------
+function askChoice(title, text, buttons) {
+  return new Promise(resolve => {
+    const ov = document.getElementById('choice-overlay');
+    document.getElementById('choice-title').textContent = title;
+    document.getElementById('choice-text').textContent = text;
+    const box = document.getElementById('choice-buttons');
+    box.innerHTML = '';
+    buttons.forEach(b => {
+      const el = document.createElement('button');
+      el.className = 'btn ' + (b.primary ? 'btn-primary' : 'btn-secondary');
+      el.style.marginTop = '8px';
+      el.textContent = b.label;
+      el.onclick = () => { ov.classList.remove('show'); resolve(b.value); };
+      box.appendChild(el);
+    });
+    ov._cancel = () => { ov.classList.remove('show'); resolve(null); };
+    ov.classList.add('show');
+  });
+}
+function closeChoice() { const ov = document.getElementById('choice-overlay'); if (ov && ov._cancel) ov._cancel(); }
+function setFsoAccommodation(on) {
+  const fso = getFso(ctx.fsoId, ctx.bookId);
+  if (!fso) return;
+  on = !!on;
+  if (fsoHasAcc(fso) === on && fso.hasAccommodation !== undefined) return;
+  if (!on && ((parseFloat(fso.nights) || 0) || (parseFloat(fso.accommodation) || 0)) &&
+      !confirm('Remove accommodation from this FSO?\n\nThe rate and nights are kept but not charged or printed.')) { renderFsoEdit(); return; }
+  fso.hasAccommodation = on;
+  addHistory(fso, 'Accommodation ' + (on ? 'added to' : 'removed from') + ' this FSO');
+  saveFsoData(fso);
+  renderFsoEdit();
+}
+
+// ---- Buttons that open company pages --------------------------------------
+function rfpLink() {
+  const L = linksCfg();
+  let it = null;
+  L.items.forEach(x => { if (!it && x.id === 'rfp') it = x; });
+  if (!it) L.items.forEach(x => { if (!it && /\bRFP\b/i.test(x.label)) it = x; });
+  return it;
+}
+function openRfpPage() {
+  const it = rfpLink();
+  if (!it || !it.url) { toast('Add the RFP page link in Settings → SharePoint shortcuts'); return; }
+  safeOpenUrl(it.url, 'RFP page');
+}
+function openJobRegister() {
+  const url = linksCfg().register;
+  if (!url) { toast('Add the FSO register link in Settings → SharePoint shortcuts'); return; }
+  safeOpenUrl(url, 'FSO register');
+}
+// Google Maps search for the customer (name + city + country). Long-press the
+// pin there to copy its coordinates.
+function mapsSearchUrl(c, fallbackName) {
+  const q = c ? [c.name, custCity(c), custCountry(c)].filter(Boolean).join(', ') : (fallbackName || '');
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q || 'John Thompson Bellville');
+}
+function openCustomerInMaps() {
+  const c = (typeof currentCustomer === 'function') ? currentCustomer() : null;
+  const nm = document.getElementById('cust-name');
+  const tmp = c ? Object.assign({}, c, {
+    name: (nm && nm.value.trim()) || c.name,
+    city: (document.getElementById('cust-city') || {}).value || c.city,
+    country: (document.getElementById('cust-country') || {}).value || c.country }) : null;
+  safeOpenUrl(mapsSearchUrl(tmp), 'Google Maps');
+}
+function openFsoCustomerInMaps() {
+  const id = document.getElementById('hf-customer-select').value;
+  const c = (APP.customers || []).find(x => x.id === id);
+  safeOpenUrl(mapsSearchUrl(c), 'Google Maps');
+}
+// Paste "-34.02, 18.85" or a full Google Maps link to set the customer location.
+function pasteCustomerLocation() {
+  const v = (prompt('Paste the location from Google Maps.\n\nLong-press the pin in Google Maps and copy the coordinates (e.g. -34.0217, 18.8473), or paste the full map link.') || '').trim();
+  if (!v) return;
+  const m = /(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/.exec(decodeURIComponent(v)) ||
+            /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(v) ||
+            /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(v);
+  if (!m) { toast('No coordinates found — copy the numbers under the pin, e.g. -34.0217, 18.8473'); return; }
+  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+  if (!(Math.abs(lat) <= 90 && Math.abs(lng) <= 180)) { toast('Those coordinates are out of range'); return; }
+  const c = currentCustomer();
+  if (!c) return;
+  c.gps = { lat, lng };
+  const office = APP.settings.office && APP.settings.office.gps;
+  if (office) {
+    const rf = APP.settings.office.roadFactor || 1.3;
+    const rt = Math.round(haversineKm(office, c.gps) * 2 * rf);
+    const kmEl = document.getElementById('cust-km');
+    if (kmEl && (!parseFloat(kmEl.value) || confirm('Set the default round trip to about ' + rt + ' km (straight line × ' + rf + ' road factor)?'))) kmEl.value = rt;
+  }
+  saveData();
+  document.getElementById('cust-gps-label').textContent = 'Set: ' + lat.toFixed(5) + ', ' + lng.toFixed(5);
+  toast('Location saved');
+}
+
+// ---- Boiler Number & More: remember per customer --------------------------
+function rememberCustomerExtras(fso) {
+  const c = (APP.customers || []).find(x => x.id === fso.header.customerId);
+  if (!c) return false;
+  const h = fso.header;
+  let ch = false;
+  const set = (k, v) => { v = (v || '').trim(); if (v && c[k] !== v) { c[k] = v; ch = true; } };
+  set('jtContractNo', h.jtContractNo); set('poNo', h.customerPONo);
+  set('vatNo', h.customerVATNo); set('accountNo', h.accountNo);
+  const b = (h.boilerNo || '').trim();
+  if (b) {
+    if (!Array.isArray(c.boilers)) c.boilers = [];
+    if (!c.boilers.some(x => (x.boilerNo || '').trim().toLowerCase() === b.toLowerCase())) { c.boilers.push({ boilerNo: b, description: '' }); ch = true; }
+  }
+  return ch;
+}
+function toggleBoilerMore(force) {
+  const box = document.getElementById('hf-more');
+  const btn = document.getElementById('hf-more-btn');
+  if (!box) return;
+  const open = force !== undefined ? force : box.style.display === 'none';
+  box.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = (open ? '▾ ' : '▸ ') + 'Boiler Number & More';
+}
+function boilerMoreSummary() {
+  const ids = ['hf-boiler', 'hf-jtcontract', 'hf-cupo', 'hf-vatnr', 'hf-accnr'];
+  const n = ids.filter(id => (document.getElementById(id) || {}).value).length;
+  const s = document.getElementById('hf-more-sum');
+  if (s) s.textContent = n ? n + ' filled in' : '';
+}
+
+// ============================================================
 // SHAREPOINT SHORTCUTS (v2.10.0)
 // Quick links to company SharePoint pages. Each engineer pastes their own
 // URLs under Settings → SharePoint shortcuts. Stored in APP.settings.links,
@@ -4926,6 +5718,7 @@ function linksCfg() {
   }
   const L = APP.settings.links;
   if (typeof L.audit !== 'string') L.audit = '';
+  if (typeof L.register !== 'string') L.register = '';
   L.items.forEach(it => { if (!Array.isArray(it.children)) it.children = []; });
   if (!APP.settings.linksUpdatedAt && (L.audit || L.items.some(it => it.url || it.pinned || it.children.some(c => c.url || c.pinned)))) {
     APP.settings.linksUpdatedAt = Date.now();
@@ -4957,7 +5750,9 @@ function sanitizeLinks(src) {
   };
   let audit = String((src && src.audit) || '').trim();
   if (linkUrlProblem(audit)) audit = '';
-  return { audit, items: ((src && Array.isArray(src.items)) ? src.items : []).slice(0, 60).map(n => clean(n, 0)) };
+  let register = String((src && src.register) || '').trim().slice(0, 2000);
+  if (linkUrlProblem(register)) register = '';
+  return { audit, register, items: ((src && Array.isArray(src.items)) ? src.items : []).slice(0, 60).map(n => clean(n, 0)) };
 }
 function mergeLinksFromCloud(cs) {
   const localAt = APP.settings.linksUpdatedAt || 0;
@@ -5065,10 +5860,12 @@ function linkRowHtml(it, urlOnly) {
 function renderSpLinks() {
   const L = linksCfg();
   document.getElementById('sp-links-offline').style.display = isOnline() ? 'none' : 'flex';
-  const any = !!L.audit || L.items.some(it => it.url || it.children.some(c => c.url));
+  const any = !!L.audit || !!L.register || L.items.some(it => it.url || it.children.some(c => c.url));
   document.getElementById('sp-links-list').innerHTML =
     (any ? '' : '<div class="card" style="margin:12px 16px"><p style="font-size:.85rem;line-height:1.5">No links set yet. ' +
       'Tap ⚙️ at the top to paste the address of each page.</p></div>') +
+    linkRowHtml({ id: '__register', icon: '🗂️', label: 'FSO register', url: L.register || '', pinned: false, children: [] }, true)
+      .replace('Open FSO register main page', 'FSO register (Open Job)').replace("openLinkUrl(&#39;__register&#39;)", 'openJobRegister()') +
     L.items.map(it => linkRowHtml(it, false)).join('');
 }
 
@@ -5135,6 +5932,7 @@ function renderSettingsLinks() {
 function drawLinksEditor() {
   const D = linksDraft;
   document.getElementById('lk-audit').value = D.audit || '';
+  document.getElementById('lk-register').value = D.register || '';
   const tb = (txt, call, title) => '<button class="lk-tb" title="' + title + '" onclick="' + call + '">' + txt + '</button>';
   const rowEd = (it, i, c) => {
     const isChild = c !== null;
@@ -5178,6 +5976,7 @@ function readLinksForm() {
     else it[f] = inp.value.trim();
   });
   D.audit = document.getElementById('lk-audit').value.trim();
+  D.register = document.getElementById('lk-register').value.trim();
 }
 
 function lkArr(i, c) { return c === null ? linksDraft.items : linksDraft.items[i].children; }
@@ -5239,8 +6038,10 @@ function saveLinksSettings() {
   D.items.forEach(it => { check(it); it.children.forEach(check); });
   const ap = linkUrlProblem(D.audit);
   if (ap) bad.unshift('Audit Report link ' + ap);
+  const rp = linkUrlProblem(D.register);
+  if (rp) bad.unshift('FSO register link ' + rp);
   // Highlight every bad field
-  document.querySelectorAll('#lk-list [data-f="url"], #lk-audit').forEach(inp => inp.classList.toggle('lk-bad', !!linkUrlProblem(inp.value)));
+  document.querySelectorAll('#lk-list [data-f="url"], #lk-audit, #lk-register').forEach(inp => inp.classList.toggle('lk-bad', !!linkUrlProblem(inp.value)));
   if (bad.length) { toast(bad[0] + (bad.length > 1 ? ' (+' + (bad.length - 1) + ' more)' : ''), 4000); return; }
   APP.settings.links = D;
   linksDraft = null;
@@ -5256,6 +6057,7 @@ async function shareLinks() {
                          children: (it.children || []).map(strip) });
   const payload = { kind: 'fso-app-links', version: 1, exportedAt: new Date().toISOString(),
                     audit: linkUrlProblem(linksDraft.audit) ? '' : linksDraft.audit,
+                    register: linkUrlProblem(linksDraft.register) ? '' : (linksDraft.register || ''),
                     items: linksDraft.items.map(strip) };
   const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 1));
   const name = 'FSO-App-links.json';
@@ -5299,7 +6101,9 @@ function importLinks(event) {
     const pinned = new Set();
     linksDraft.items.forEach(it => { if (it.pinned) pinned.add(it.label); it.children.forEach(c => { if (c.pinned) pinned.add(c.label); }); });
     items.forEach(it => { it.pinned = pinned.has(it.label); it.children.forEach(c => { c.pinned = pinned.has(c.label); }); });
-    linksDraft = { audit: audit || linksDraft.audit, items };
+    let register = String(data.register || '').trim().slice(0, 2000);
+    if (linkUrlProblem(register)) { register = ''; dropped++; }
+    linksDraft = { audit: audit || linksDraft.audit, register: register || linksDraft.register || '', items };
     drawLinksEditor();
     toast('Imported — check the links, then tap ✓ to save' + (dropped ? ' · ' + dropped + ' non-https link(s) removed' : ''), 4000);
   };
@@ -5333,6 +6137,7 @@ function initBackHandling() {
 function handleHardwareBack() {
   // Close an open overlay first, using its own close routine
   const overlays = [
+    ['choice-overlay', closeChoice],
     ['date-overlay', typeof closeDatePicker === 'function' ? closeDatePicker : null],
     ['material-overlay', typeof closeMaterialSearch === 'function' ? closeMaterialSearch : null],
     ['history-overlay', typeof closeHistory === 'function' ? closeHistory : null],
@@ -5501,7 +6306,7 @@ const OD_GRAPH = 'https://graph.microsoft.com/v1.0';
 // would block every engineer's sign-in with an approval screen).
 function odScopes() {
   const s = ['Files.ReadWrite', 'User.Read', 'Mail.Send'];
-  try { if (spCfg().uploadEnabled) s.push('Sites.ReadWrite.All'); } catch (e) {}
+  try { if (FEATURES.spJobFolder && spCfg().uploadEnabled) s.push('Sites.ReadWrite.All'); } catch (e) {}
   return s;
 }
 let msalApp = null;       // MSAL PublicClientApplication
@@ -5778,7 +6583,7 @@ async function odBuildFsoXlsx(fso, folderId, fileName) {
     // Populate every range from the same writer used for the book workbook.
     const base = wbBase + "/worksheets('" + encodeURIComponent(sheetName) + "')/range(address='";
     for (const w of fsoSheetWrites(fso)) {
-      await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values }, headers: hdr });
+      await gFetchWb('PATCH', base + w.address + "')", { json: w.numberFormat ? { numberFormat: w.numberFormat } : { values: w.values }, headers: hdr });
     }
     // Signature images can't go through the workbook API; the sheet keeps the
     // template's placeholders. The signed record is the PDF built from here.
@@ -6016,7 +6821,7 @@ async function odEmailFso(fso, recipients, pdfBytes, ccList, kind) {
   // Graph direct-attach limit is ~3MB total; include ticked attachments while they fit.
   let budget = 2.6 * 1024 * 1024 - (atts[0].contentBytes.length * 0.75);
   const skipped = [];
-  for (const a of (fso.attachments || []).filter(a => a.includeInExport)) {
+  for (const a of (fso.attachments || []).filter(a => a.includeInExport && (!a.receipt || kind === 'admin'))) {
     const b64 = await attGetB64(a);
     if (!b64) { skipped.push(a.name); continue; }
     const sz = b64.length * 0.75;
@@ -6281,7 +7086,8 @@ function fsoSheetWrites(fso) {
   const book = APP.books[fso.bookId];
   const h = fso.header;
   const cust = (APP.customers || []).find(c => c.id === h.customerId);
-  const t = calcTotals(fso);
+  const t = calcTotalsFx(fso);
+  const fxr = t.fxRate, cur = fsoCur(fso).code;
   const W = [];
   const one = (addr, v) => W.push({ address: addr, values: [[(v == null ? '' : v)]] });
 
@@ -6293,7 +7099,7 @@ function fsoSheetWrites(fso) {
   // real line breaks or a comma-separated address (how it arrives from import).
   const addr = splitAddressLines(h.addressSite);
   W.push({ address: 'F15:F19', values: [   // F15 customer, F16 street, F17 city, F18 country, F19 spare
-    [h.customer || (cust && cust.name) || ''], [addr[0] || ''], [addr[1] || ''], [addr[2] || ''], [addr[3] || '']
+    [fsoCustLabel(fso) || h.customer || (cust && cust.name) || ''], [addr[0] || ''], [addr[1] || ''], [addr[2] || ''], [addr[3] || '']
   ]});
   W.push({ address: 'X15:X21', values: [
     [h.jtContractNo || ''], [h.boilerNo || ''], [h.customerPONo || ''], [h.customerVATNo || ''],
@@ -6305,6 +7111,7 @@ function fsoSheetWrites(fso) {
   one('F20', (fso.header.officialNo || '').trim() || fso.fsoNumber);
 
   const cols = { A: [], F: [], I: [], R: [], T: [], V: [], AD: [], AM: [] };
+  const matRows = materialSheetRows(fso);
   for (let i = 0; i < 15; i++) {
     const d = fso.days[i];
     if (d) {
@@ -6314,11 +7121,12 @@ function fsoSheetWrites(fso) {
       cols.R.push([parseFloat(d.ntHours) || '']);
       cols.T.push([parseFloat(d.ot15Hours) || '']);
       cols.V.push([parseFloat(d.ot20Hours) || '']);
-      cols.AD.push([(d.materials || []).map(m => m.description).filter(Boolean).join(', ') || '']);
-      cols.AM.push([(d.materials || []).reduce((s, m) => s + (parseFloat(m.totalSelling) || 0), 0) || '']);
     } else {
-      Object.keys(cols).forEach(k => cols[k].push(['']));
+      ['A', 'F', 'I', 'R', 'T', 'V'].forEach(k => cols[k].push(['']));
     }
+    const mr = matRows[i];
+    cols.AD.push([mr ? mr.text : '']);
+    cols.AM.push([mr && mr.value ? Math.round(mr.value * fxr * 100) / 100 : '']);
   }
   W.push({ address: 'A25:A39', values: cols.A });
   W.push({ address: 'F25:F39', values: cols.F });
@@ -6331,8 +7139,8 @@ function fsoSheetWrites(fso) {
 
   one('AM40', t.totalMaterials || '');
   one('A42', h.description || '');           // job overview / work done block A42:A59
-  one('I68', parseFloat(fso.nights) || '');
-  one('M68', parseFloat(fso.accommodation) || '');
+  one('I68', fsoHasAcc(fso) ? (parseFloat(fso.nights) || '') : '');
+  one('M68', fsoHasAcc(fso) ? (Math.round((parseFloat(fso.accommodation) || 0) * fxr * 100) / 100 || '') : '');
   const engName = (APP.books[fso.bookId].config.engineerName || '');
   one('X19', engName);                        // Service Engineer (header block)
   one('AE70', engName);                       // Service Engineer (signature block)
@@ -6357,6 +7165,14 @@ function fsoSheetWrites(fso) {
     one('R69', t.subtotal || 0);
     if (!t.vatAmt) one('I70', 0);
   }
+  if (fxNoVat(fso)) one('I70', 0);
+  // Currency symbol: headings + number formats of every money cell
+  const nf = fxNumberFormat(cur === 'ZAR' ? 'ZAR' : cur);
+  if (cur !== 'ZAR') {
+    one('AM24', CURRENCIES[cur].sym + ' c'); one('R60', cur);
+  } else { one('AM24', 'R c'); one('R60', 'R C'); }
+  const fmt = (addr, rows, cols) => W.push({ address: addr, numberFormat: Array.from({ length: rows }, () => Array(cols || 1).fill(nf)) });
+  fmt('AM25:AM40', 16); fmt('M61:M64', 4); fmt('R61:R72', 12); fmt('I70', 1); fmt('M68', 1);
   return W;
 }
 
@@ -6385,9 +7201,16 @@ async function odExportFso(fso) {
   const writes = fsoSheetWrites(fso);
   let wrote = 0;
   for (const w of writes) {
-    await gFetchWb('PATCH', base + w.address + "')", { json: { values: w.values }, headers: hdr });
+    await gFetchWb('PATCH', base + w.address + "')", { json: w.numberFormat ? { numberFormat: w.numberFormat } : { values: w.values }, headers: hdr });
     wrote++;
   }
+  // All sheet: currency column K, so foreign FSOs stand out in the totals
+  try {
+    const r = allRowFor(book, fso.fsoNumber);
+    const allBase = "/me/drive/items/" + itemId + "/workbook/worksheets('All')/range(address='";
+    await gFetchWb('PATCH', allBase + "K1')", { json: { values: [['Currency']] }, headers: hdr });
+    if (r >= 2) await gFetchWb('PATCH', allBase + "K" + r + "')", { json: { values: [[fsoCur(fso).code]] }, headers: hdr });
+  } catch (e) { console.warn('All currency column', e); }
   // Confirm something actually landed (read back the customer cell).
   try {
     const chk = await gFetchWb('GET', "/me/drive/items/" + itemId + "/workbook/worksheets('" + encodeURIComponent(sheet) + "')/range(address='F15')", { headers: hdr });
@@ -6534,7 +7357,7 @@ async function odDrainQueue() {
           fso.status = 'sent'; fso.exportedDate = todayStr(); fso.exportState = 'sent';
           let pdfBytes = null;
           if (op.fmt === 'pdf') {
-            try { const pdf = await odMakeFsoPdf(fso); pdfBytes = pdf.bytes; addHistory(fso, 'PDF exported (queued send): ' + pdf.name); }
+            try { const pdf = await ensureFsoPdf(fso); pdfBytes = pdf.bytes; addHistory(fso, 'PDF exported (queued send): ' + pdf.name); }
             catch (e) { console.warn('queued pdf', e); }
           }
           if (op.emails && op.emails.length) {

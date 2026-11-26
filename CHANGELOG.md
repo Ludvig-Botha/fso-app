@@ -1,5 +1,78 @@
 # Changelog
 
+## v2.12.0 — 2026-11-26
+- **The app's FSO number is the number of record.** The "Official FSO number
+  (SharePoint)" section and the hard export block are switched off
+  (`FEATURES.officialNo = false`; code kept, flip to true to bring back). FSOs
+  that already have an official number keep using it in names (same number).
+- **SharePoint job folder feature hidden** (`FEATURES.spJobFolder = false`): the
+  per-FSO folder link, "Register job", the registration page and the "upload
+  exports to SharePoint" settings are hidden and nothing is uploaded there.
+- **"Create / Update job" split in two:**
+  - **Create** — makes the OneDrive job folder and its Excel sheet only.
+  - **Print PDF / Update** — writes the latest data to the sheet, then prints
+    the PDF. A new revision ("… FSO Rev 1.pdf", "Rev 2", …) is made ONLY when
+    something printed has changed. If the only change is signatures added to a
+    PDF that wasn't fully signed, that PDF is replaced (same name, no Rev). A
+    fully signed PDF is never overwritten. Printing with nothing changed just
+    shows the latest PDF. Emails and the export screen follow the same rules
+    (no more new revision on every send). Printing is not blocked by missing
+    signatures.
+- **Latest PDF** (replaces the SharePoint folder button) opens the newest PDF —
+  from this device's copy when offline. **Share PDF** sends it through the
+  phone's share menu (email, WhatsApp, …); downloads it where sharing isn't
+  available.
+- **Currency: ZAR / USD / GBP.** Chosen when the FSO is created (same screen
+  as the accommodation question) and changeable on the FSO page's Currency
+  card. Everything is entered in Rand; the rate (ExchangeRate-API, free, no
+  account) is captured at creation and only changes on **Update rate** or
+  **Override** ("1 USD = R …"). The PDF and the FSO's sheet print every rate,
+  line value and total in the chosen currency with $ / £ formats and headings.
+  Foreign-currency FSOs exclude VAT by default, with an "+ Add VAT" button.
+  Printing/emailing is blocked until a rate has been captured.
+- **Book workbook:** the FSO's sheet shows its currency, and the All sheet has
+  a new **Currency** column (K) so foreign FSOs stand out in the totals.
+- **Material receipts** are uploaded to "<job folder>/Receipts" on Create and on
+  Print PDF / Update, are never on the PDF, and are attached to the admin email
+  only (never the customer email).
+- SW cache v31.
+
+## v2.11.0 — 2026-11-26
+- **Accommodation is no longer on every FSO.** Creating an FSO asks "Is
+  accommodation part of this FSO?". With No, the accommodation block is hidden,
+  not charged and not printed. The FSO page has "+ Add" / "Remove" to change it
+  later (rate and nights are kept when removed). Existing FSOs keep it only if
+  they already had a rate or nights.
+- **Materials moved from the days to the FSO.** New Materials card on the FSO
+  page opens a Materials screen: date bought / drawn, description (stores
+  search still works), stock code, qty, cost, selling price, and a receipt
+  photo per item (saved under Attachments as "Receipt - <item>.jpg"). Existing
+  day materials are moved across automatically with their day's date. The FSO
+  prints one item per line: name × qty and the line total.
+- **Overtime on the overview.** Each day on the FSO page shows NT, 1.5 and 2.0
+  hours (no totals); the PDF prints hours as before.
+- **Customer name with area** everywhere (drop-down, customer list, FSO list,
+  FSO page, PDF "Customer" box): "Southern Oil, Swellendam" locally,
+  "JTI, Lilongwe, Malawi" for customers outside South Africa. New City and
+  Country fields on the customer (filled from 4-line imported addresses;
+  import now stores them directly).
+- **Customers sorted alphabetically** in the FSO drop-down (new customers no
+  longer sit at the bottom) and in the customer list.
+- **Google Maps**: "Find on Google Maps" on the customer and on FSO Details
+  searches for the customer; "Paste location" on the customer takes the
+  coordinates (or a full map link) and offers a round-trip km estimate.
+- **RFP page ↗** next to Call out / Quote (uses the RFP link from SharePoint
+  shortcuts).
+- **Open Job ↗** at the bottom of every FSO opens the FSO register sheet. Its
+  link is a new field in Settings → SharePoint shortcuts (also listed on the
+  SharePoint page, synced between devices and included in share files).
+- **Boiler Number & More**: Boiler No., JT Contract, Customer PO, Customer VAT
+  and Account No. moved into a fold-out at the bottom of FSO Details. Still
+  printed when filled in, and remembered on the customer (boiler numbers are
+  added to the customer's boiler list) for the next FSO.
+- FSO list rows: "<FSO no> · <Customer, City>" with the job description below.
+- SW cache v30.
+
 ## v2.10.1 — 2026-11-26
 - FIX (links entered on one device didn't appear on another): SharePoint
   shortcut links and pins were saved only on the device they were typed on.
