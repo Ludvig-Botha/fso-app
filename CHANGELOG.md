@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.13.4 — 2026-11-27
+- Shared (Sent) FSOs stay fully editable; an FSO only locks once it is marked
+  Completed (editing a completed one still goes through "Edit (creates revision)").
+- Open Job register row, column I: the short folder description (FSO Details →
+  Folder description; the job description when that is empty).
+- SW cache v36.
+
 ## v2.13.3 — 2026-11-27
 - **Open Job copies a full FSO-register row** (tab-separated, columns A–K), so one
   paste in column A fills the row:

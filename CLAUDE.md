@@ -185,7 +185,9 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
 - `links.custSearch` (Customers 🔍) handled exactly like `links.register`.
 - `openJobRegister` copies `registerRow(fso)` (v2.13.3: register columns A–K, tab-separated —
   pending · created date · FSO no · customer, city · Int/Ext · dept · Local/Export · country|SA ·
-  description · PO|No · symbol+subtotal in FSO currency) before opening the register.
+  folder description (`fsoFolderDesc`) · PO|No · symbol+subtotal in FSO currency) before opening.
+- v2.13.4: only `complete` locks an FSO (`isArchived` in `renderFsoEdit`); Sent stays editable.
+  `STATUS_ARCHIVE` still decides what the Archive screen lists.
 
 ## Azure / Graph
 

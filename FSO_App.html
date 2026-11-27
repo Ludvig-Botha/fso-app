@@ -1565,7 +1565,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.13.3';
+const APP_VERSION = '2.13.4';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -2341,7 +2341,7 @@ function renderFsoEdit() {
   document.getElementById('fso-status-chip').innerHTML = statusChipFor(fso);
 
   const t = calcTotals(fso);
-  const isArchived = STATUS_ARCHIVE.includes(fso.status);
+  const isArchived = fso.status === 'complete';   // v2.13.4: shared (Sent) FSOs stay editable until Completed
 
   let html = '';
 
@@ -5242,7 +5242,7 @@ function registerRow(fso) {
     h.jobType === 'INTERNAL' ? (h.department || '') : '',
     local ? 'Local' : 'Export',
     country || 'SA',
-    h.description || '',
+    fsoFolderDesc(h),                    // the short description used for the folder name
     (h.customerPONo || '').trim() || 'No',
     amount
   ].map(clean);
