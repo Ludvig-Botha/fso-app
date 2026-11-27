@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.13.3 — 2026-11-27
+- **Open Job copies a full FSO-register row** (tab-separated, columns A–K), so one
+  paste in column A fills the row:
+  A "pending" · B date the FSO was created (dd/mm/yyyy) · C FSO number ·
+  D customer (name, city) · E Internal / External · F department (blank unless
+  internal with a department) · G Local / Export (from the customer's country) ·
+  H country ("SA" when none entered) · I job description (line breaks flattened) ·
+  J customer PO ("No" when blank) · K total excl. VAT in the FSO's currency
+  (R / $ / £).
+- SW cache v35.
+
 ## v2.13.2 — 2026-11-27
 - **Saved signature syncs between devices.** Sign once on the phone (Settings →
   Engineer Profile → My signature); it travels through OneDrive to the laptop

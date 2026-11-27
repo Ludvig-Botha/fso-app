@@ -1565,7 +1565,7 @@ const TEMPLATE_XLSX_B64 = "UEsDBBQAAAAIAMKw+lz9ppuBgwEAAOIFAAATAAAAW0NvbnRlbnRfV
 let APP = null;
 // Bump on every push to GitHub — shown in Settings → About and in the console,
 // so any engineer (or IT) can confirm which build they're running.
-const APP_VERSION = '2.13.2';
+const APP_VERSION = '2.13.3';
 let navStack = [];
 let ctx = {};  // {fsoId, bookId, dayId, sigMode}
 let activeFilter = 'all';
@@ -5219,12 +5219,37 @@ function autoOpenProgress(fso) {
   return true;
 }
 
-// ---- Open Job: copy "Customer<TAB>total excl. VAT" for the register sheet -----
+// ---- Open Job: copy one register row (columns A–K) for the FSO register sheet --
+// A Job opened ("pending") · B Date created · C FSO number · D Customer · E Internal/External ·
+// F Department · G Local/Export · H Country (SA if blank) · I Description · J PO (No if blank) ·
+// K Total excl. VAT in the FSO's currency. Tab-separated: one paste in column A fills the row.
+function registerRow(fso) {
+  const h = fso.header || {};
+  const c = (APP.customers || []).find(x => x.id === h.customerId);
+  const clean = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  const country = (custCountry(c) || '').trim();
+  const local = isLocalCountry(country);
+  const name = c ? [c.name, custCity(c)].filter(Boolean).join(', ') : (h.customer || '');
+  const t = calcTotalsFx(fso);
+  const cur = fsoCur(fso).code;
+  const amount = (CURRENCIES[cur] || CURRENCIES.ZAR).sym + (Math.round((t.subtotal || 0) * 100) / 100).toFixed(2);
+  return [
+    'pending',
+    ddmmyyyy(fso.createdDate || h.date || todayStr()),
+    (h.officialNo || '').trim() || fso.fsoNumber,
+    name,
+    h.jobType === 'INTERNAL' ? 'Internal' : 'External',
+    h.jobType === 'INTERNAL' ? (h.department || '') : '',
+    local ? 'Local' : 'Export',
+    country || 'SA',
+    h.description || '',
+    (h.customerPONo || '').trim() || 'No',
+    amount
+  ].map(clean);
+}
 function copyJobForRegister(fso) {
   if (!fso || !navigator.clipboard || !navigator.clipboard.writeText) return null;
-  const t = calcTotalsFx(fso);
-  const amt = (Math.round((t.subtotal || 0) * 100) / 100).toFixed(2);
-  const text = (fsoCustLabel(fso) || fso.header.customer || '') + '\t' + amt;
+  const text = registerRow(fso).join('\t');
   return navigator.clipboard.writeText(text).then(() => text);
 }
 
@@ -6073,7 +6098,7 @@ function openJobRegister() {
   const fso = ctx.fsoId ? getFso(ctx.fsoId, ctx.bookId) : null;
   // Copy first, while the tap still counts as a user action (the clipboard needs it)
   const cp = fso ? copyJobForRegister(fso) : null;
-  if (cp) cp.then(t => toast('Copied: ' + t.replace('\t', '  ·  ') + ' — paste into the sheet', 4000))
+  if (cp) cp.then(() => toast('Row copied (A–K) — click column A in the sheet and paste', 4000))
             .catch(() => toast('Could not copy the customer and total'));
   safeOpenUrl(url, 'FSO register');
 }

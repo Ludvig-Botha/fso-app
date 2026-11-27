@@ -183,7 +183,9 @@ customer signatures, and syncs to OneDrive/SharePoint via MSAL + Microsoft Graph
   `fsoHasWork` (days, materials, quote amount, or subtotal excl. call-out > 0).
 - Phone contacts: Contact Picker API (`pickPhoneContact`, `newCustomerChoice`) — Android Chrome only.
 - `links.custSearch` (Customers 🔍) handled exactly like `links.register`.
-- `openJobRegister` copies `fsoCustLabel + TAB + subtotal (FSO currency)` before opening.
+- `openJobRegister` copies `registerRow(fso)` (v2.13.3: register columns A–K, tab-separated —
+  pending · created date · FSO no · customer, city · Int/Ext · dept · Local/Export · country|SA ·
+  description · PO|No · symbol+subtotal in FSO currency) before opening the register.
 
 ## Azure / Graph
 
